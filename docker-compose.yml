@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  detection-service:
+    build: .
+    container_name: voiceguard-demo
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models       # mount trained model checkpoints
+      - ./logs:/app/logs           # persist decision logs
+      - ./results:/app/results     # persist evaluation results
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - voiceguard-net
+
+  # Optional: Redis for session state (uncomment for multi-worker deployment)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: voiceguard-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - voiceguard-net
+
+networks:
+  voiceguard-net:
+    driver: bridge

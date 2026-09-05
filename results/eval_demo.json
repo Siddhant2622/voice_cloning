@@ -1,0 +1,13 @@
+{
+  "partition": "demo",
+  "n_total": 7,
+  "n_genuine": 2,
+  "n_spoof": 5,
+  "eer": 0.0,
+  "threshold": 0.5,
+  "apcer": 0.0,
+  "bpcer": 0.0,
+  "attack_eers": {
+    "pyttsx3": 0.0
+  }
+}

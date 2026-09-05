@@ -1,0 +1,22 @@
+thresholds:
+  block:   0.88
+  alert:   0.72
+  step_up: 0.50
+
+context_penalties:
+  caller_id_spoofed:     0.10
+  geolocation_mismatch:  0.06
+  sim_swap_flagged:      0.12
+  number_reputation_bad: 0.08
+  unusual_time:          0.04
+  unusual_request:       0.05
+
+transaction_risk_tiers:
+  1000:  0.03
+  10000: 0.07
+  50000: 0.12
+
+high_risk_actions:
+  wire_transfer:    0.10
+  password_reset:   0.05
+  account_takeover: 0.15

@@ -1,0 +1,18 @@
+{
+  "name": "voice-cloning-detection",
+  "version": "1.0.0",
+  "description": "VoiceGuard — Real-Time Voice Clone Detection Prototype",
+  "scripts": {
+    "dev": "npx serve public",
+    "start": "npx serve public"
+  },
+  "keywords": [
+    "voice-cloning",
+    "deepfake-detection",
+    "voice-anti-spoofing",
+    "audio-security",
+    "asvspoof"
+  ],
+  "author": "siddhant2622",
+  "license": "MIT"
+}

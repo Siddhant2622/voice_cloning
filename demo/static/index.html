@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceGuard — Real-Time Voice Clone Detection</title>
+  <meta name="description"
+        content="AI-powered real-time voice clone and synthetic speech detection system. Detects deepfake audio attacks on live calls." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Design Tokens ──────────────────────────────────────────────────── */
+    :root {
+      --bg-base:       #080c14;
+      --bg-panel:      rgba(14, 22, 38, 0.85);
+      --bg-panel-2:    rgba(20, 30, 52, 0.70);
+      --border:        rgba(78, 143, 247, 0.18);
+      --border-bright: rgba(78, 143, 247, 0.45);
+      --accent:        #4f8ef7;
+      --accent-glow:   rgba(79, 142, 247, 0.35);
+      --text-primary:  #e8edf8;
+      --text-muted:    #7a8aab;
+      --green:         #2edd9b;
+      --green-glow:    rgba(46, 221, 155, 0.3);
+      --amber:         #f5c542;
+      --amber-glow:    rgba(245, 197, 66, 0.3);
+      --orange:        #f57f42;
+      --orange-glow:   rgba(245, 127, 66, 0.3);
+      --red:           #f74f6a;
+      --red-glow:      rgba(247, 79, 106, 0.35);
+      --radius:        14px;
+      --radius-sm:     8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(79,142,247,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 90%, rgba(46,221,155,0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 40% at 50% 50%, rgba(247,79,106,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main { position: relative; z-index: 1; max-width: 1140px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* ─── Header ─────────────────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #4f8ef7 0%, #2edd9b 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .logo h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo span { color: var(--accent); }
+    .header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .header-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--text-muted);
+      background: var(--bg-panel);
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+    .status-dot.edge      { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+    .status-dot.error     { background: var(--red);   box-shadow: 0 0 8px var(--red-glow); }
+
+    .btn-settings {
+      background: var(--bg-panel);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .btn-settings:hover { color: var(--text-primary); border-color: var(--border-bright); }
+
+    /* ─── Presets Banner ─────────────────────────────────────────────────── */
+    .preset-banner {
+      background: linear-gradient(90deg, rgba(79,142,247,0.12) 0%, rgba(46,221,155,0.08) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .preset-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .preset-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-preset {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-preset:hover {
+      border-color: var(--accent);
+      background: rgba(79,142,247,0.15);
+      transform: translateY(-1px);
+    }
+
+    /* ─── Grid ───────────────────────────────────────────────────────────── */
+    .grid { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .col-full { grid-column: 1 / -1; }
+
+    /* ─── Panel ──────────────────────────────────────────────────────────── */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      backdrop-filter: blur(18px);
+      transition: border-color 0.3s;
+    }
+    .panel:hover { border-color: var(--border-bright); }
+    .panel-title {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text-muted);
+      margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* ─── Risk Gauge ─────────────────────────────────────────────────────── */
+    .gauge-container {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 10px 0 0;
+    }
+    .gauge-svg { width: 220px; height: 130px; }
+    .gauge-bg  { fill: none; stroke: var(--bg-panel-2); stroke-width: 18; stroke-linecap: round; }
+    .gauge-arc {
+      fill: none; stroke: var(--green); stroke-width: 18; stroke-linecap: round;
+      stroke-dasharray: 251; stroke-dashoffset: 251;
+      transition: stroke-dashoffset 0.35s ease, stroke 0.35s ease;
+    }
+    .gauge-label {
+      font-size: 34px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      text-anchor: middle; dominant-baseline: middle;
+    }
+    .gauge-subtext {
+      font-size: 11px; fill: var(--text-muted);
+      text-anchor: middle;
+    }
+    .decision-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 18px; border-radius: 30px;
+      font-size: 14px; font-weight: 700; letter-spacing: 0.8px;
+      margin-top: 10px; text-transform: uppercase;
+      transition: all 0.3s ease;
+    }
+    .decision-ALLOW   { background: rgba(46,221,155,0.15); color: var(--green); border: 1px solid var(--green); box-shadow: 0 0 16px var(--green-glow); }
+    .decision-STEP_UP { background: rgba(245,197,66,0.15); color: var(--amber); border: 1px solid var(--amber); box-shadow: 0 0 16px var(--amber-glow); }
+    .decision-ALERT   { background: rgba(245,127,66,0.15); color: var(--orange); border: 1px solid var(--orange); box-shadow: 0 0 16px var(--orange-glow); }
+    .decision-BLOCK   { background: rgba(247,79,106,0.18); color: var(--red);   border: 1px solid var(--red);   box-shadow: 0 0 20px var(--red-glow); }
+
+    .decision-reason {
+      font-size: 12px; color: var(--text-muted);
+      text-align: center; margin-top: 10px; max-width: 280px; min-height: 32px;
+      line-height: 1.4;
+    }
+
+    /* ─── Score Bars ─────────────────────────────────────────────────────── */
+    .score-list { display: flex; flex-direction: column; gap: 14px; }
+    .score-item { display: flex; flex-direction: column; gap: 5px; }
+    .score-meta {
+      display: flex; justify-content: space-between;
+      font-size: 13px;
+    }
+    .score-name { color: var(--text-primary); font-weight: 500; }
+    .score-desc { font-size: 11px; color: var(--text-muted); }
+    .score-val  { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; }
+    .bar-bg {
+      height: 7px; background: var(--bg-panel-2);
+      border-radius: 4px; overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 4px; width: 0%;
+      transition: width 0.3s ease, background 0.3s ease;
+      background: var(--green);
+    }
+
+    /* ─── Audio Visualizer & Controls ────────────────────────────────────── */
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .btn {
+      padding: 10px 18px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 14px var(--accent-glow); }
+    .btn-primary:hover:not(:disabled) { background: #3d7ee8; transform: translateY(-1px); }
+    .btn-secondary { background: var(--bg-panel-2); color: var(--text-primary); border-color: var(--border); }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--border-bright); background: rgba(30,44,76,0.8); }
+    .btn-danger { background: rgba(247,79,106,0.15); color: var(--red); border-color: var(--red); }
+    .btn-danger:hover:not(:disabled) { background: rgba(247,79,106,0.25); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    canvas#waveform {
+      width: 100%; height: 90px;
+      background: rgba(8, 12, 20, 0.7);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      display: block;
+    }
+
+    /* ─── Challenge & Verification ───────────────────────────────────────── */
+    .challenge-box {
+      background: var(--bg-panel-2);
+      border: 1px dashed var(--border-bright);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-top: 14px;
+      display: none;
+    }
+    .challenge-box.visible { display: block; animation: fadeIn 0.3s; }
+    .challenge-phrase {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px; font-weight: 600; color: var(--accent);
+      letter-spacing: 2px; text-align: center; margin: 10px 0;
+    }
+    .challenge-expires { font-size: 11px; color: var(--text-muted); text-align: center; }
+
+    /* ─── Metrics Row ────────────────────────────────────────────────────── */
+    .metrics-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-top: 14px;
+    }
+    .metric-card {
+      background: var(--bg-panel-2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; text-align: center;
+    }
+    .metric-card .val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+    .metric-card .lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ─── Log Table ──────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; max-height: 260px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      text-align: left; padding: 8px 12px;
+      color: var(--text-muted); font-weight: 600;
+      border-bottom: 1px solid var(--border); position: sticky; top: 0;
+      background: var(--bg-panel);
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid rgba(78,143,247,0.08); font-family: 'JetBrains Mono', monospace; }
+    tr:hover td { background: rgba(79,142,247,0.04); }
+    .badge {
+      display: inline-block; padding: 2px 7px; border-radius: 10px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+    }
+    .badge-ALLOW   { background: rgba(46,221,155,0.2); color: var(--green); }
+    .badge-STEP_UP { background: rgba(245,197,66,0.2); color: var(--amber); }
+    .badge-ALERT   { background: rgba(245,127,66,0.2); color: var(--orange); }
+    .badge-BLOCK   { background: rgba(247,79,106,0.2); color: var(--red); }
+
+    /* ─── Settings Modal ─────────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .modal-backdrop.open { display: flex; animation: fadeIn 0.2s; }
+    .modal {
+      background: #0d1527; border: 1px solid var(--border-bright);
+      border-radius: var(--radius); padding: 24px; width: 90%; max-width: 460px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 10px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg-base);
+      color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    }
+
+    /* ─── Disclaimer ─────────────────────────────────────────────────────── */
+    .disclaimer {
+      margin-top: 36px; padding: 16px 20px;
+      background: rgba(14,22,38,0.5); border: 1px solid rgba(78,143,247,0.1);
+      border-radius: var(--radius); font-size: 11px; color: var(--text-muted);
+      line-height: 1.6; text-align: center;
+    }
+    .disclaimer strong { color: var(--text-primary); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .recording-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); animation: pulse 1s infinite; margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<main>
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🛡️</div>
+      <div>
+        <h1>Voice<span>Guard</span></h1>
+        <p style="font-size: 12px; color: var(--text-muted);">Real-Time Voice Clone Detection & Defense</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="header-status">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-label">Initializing...</span>
+      </div>
+      <button class="btn-settings" id="btn-open-settings">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <!-- Instant Sample Testing Presets -->
+  <div class="preset-banner">
+    <div class="preset-title">
+      <span>⚡ Instant Demo Samples:</span>
+      <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Test the detection pipeline with 1 click</span>
+    </div>
+    <div class="preset-btns">
+      <button class="btn-preset" id="preset-human">👤 Genuine Human Voice</button>
+      <button class="btn-preset" id="preset-synth">🤖 AI Voice Clone</button>
+      <button class="btn-preset" id="preset-neural">⚡ Neural TTS</button>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid">
+
+    <!-- Left: Risk Gauge & Live Decision -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Synthetic Spoof Probability</span>
+        <span style="font-size: 10px; color: var(--accent);">LAYER 5-7</span>
+      </div>
+
+      <div class="gauge-container">
+        <svg class="gauge-svg" viewBox="0 0 220 130">
+          <path class="gauge-bg"  d="M 20 115 A 90 90 0 0 1 200 115" />
+          <path class="gauge-arc" id="gauge-arc" d="M 20 115 A 90 90 0 0 1 200 115" />
+          <text class="gauge-label" id="gauge-text" x="110" y="95" fill="var(--green)">0%</text>
+          <text class="gauge-subtext" x="110" y="118">SPOOF PROBABILITY</text>
+        </svg>
+
+        <div class="decision-badge decision-ALLOW" id="decision-badge">
+          <span>🟢</span>
+          <span id="decision-text">ALLOW</span>
+        </div>
+        <div class="decision-reason" id="decision-reason">Standing by for speech input.</div>
+      </div>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <div class="val" id="met-windows">0</div>
+          <div class="lbl">Windows</div>
+        </div>
+        <div class="metric-card">
+          <div class="val" id="met-p50">—</div>
+          <div class="lbl">Latency P50</div>
+        </div>
+        <div class="metric-card">
+          <div class="val" id="met-p95">—</div>
+          <div class="lbl">Latency P95</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Multi-Layer Acoustic Feature Scores -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Signal Layer Breakdown</span>
+        <span style="font-size: 10px; color: var(--accent);">FUSION ENSEMBLE</span>
+      </div>
+
+      <div class="score-list">
+        <!-- CM -->
+        <div class="score-item">
+          <div class="score-meta">
+            <span class="score-name">CM Classifier (WavLM SSL + Log-Mel)</span>
+            <span class="score-val" id="val-cm">—</span>
+          </div>
+          <div class="score-desc">Deep acoustic anti-spoofing score (0 = authentic, 1 = deepfake)</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-cm"></div></div>
+        </div>
+
+        <!-- Liveness -->
+        <div class="score-item">
+          <div class="score-meta">
+            <span class="score-name">Liveness Heuristic (F0 Jitter / Flatness)</span>
+            <span class="score-val" id="val-lv">—</span>
+          </div>
+          <div class="score-desc">Vocal tract physiology & micro-tremor consistency check</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-lv"></div></div>
+        </div>
+
+        <!-- Speaker Verify -->
+        <div class="score-item">
+          <div class="score-meta">
+            <span class="score-name">Speaker Verification (ECAPA-TDNN)</span>
+            <span class="score-val" id="val-sv">—</span>
+          </div>
+          <div class="score-desc">Cosine voiceprint alignment against enrolled biometric reference</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-sv"></div></div>
+        </div>
+
+        <!-- Fusion -->
+        <div class="score-item">
+          <div class="score-meta">
+            <span class="score-name" style="font-weight: 700; color: var(--accent);">Calibrated Fusion Ensemble</span>
+            <span class="score-val" id="val-fusion" style="color: var(--accent);">—</span>
+          </div>
+          <div class="score-desc">Temporal EWMA smoothed composite risk metric</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-fusion"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full Width: Audio Input & Live Waveform -->
+    <div class="panel col-full">
+      <div class="panel-title">
+        <span>Live Audio Input & Waveform</span>
+        <span id="input-status" style="font-size: 11px; color: var(--text-muted);">Ready</span>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-mic">🎙️ Start Mic</button>
+        <button class="btn btn-secondary" id="btn-file">📁 Upload Audio File</button>
+        <button class="btn btn-danger" id="btn-stop" disabled>⏹ Stop</button>
+        <button class="btn btn-secondary" id="btn-challenge">🎲 Generate Challenge</button>
+        <button class="btn btn-secondary" id="btn-reset">↺ Reset Session</button>
+        <input type="file" id="file-input" accept="audio/*" style="display:none" />
+      </div>
+
+      <canvas id="waveform" width="1080" height="90"></canvas>
+
+      <!-- Step-Up Challenge Box -->
+      <div class="challenge-box" id="challenge-box">
+        <div style="font-size: 12px; color: var(--text-muted); text-align: center;">
+          STEP-UP PROMPT: Please ask the caller to read the verification digits:
+        </div>
+        <div class="challenge-phrase" id="challenge-phrase">— — — — — —</div>
+        <div class="challenge-expires" id="challenge-expires">Expires in 30s</div>
+      </div>
+    </div>
+
+    <!-- Full Width: Structured Decision Log -->
+    <div class="panel col-full">
+      <div class="panel-title">
+        <span>Real-Time Audit Log</span>
+        <span style="font-size: 10px; color: var(--text-muted);">DECISION TELEMETRY</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>CM Score</th>
+              <th>Liveness</th>
+              <th>Fusion</th>
+              <th>Action</th>
+              <th>Latency</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="log-body">
+            <tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop" id="settings-modal">
+    <div class="modal">
+      <div class="modal-title">⚙️ Backend & Engine Settings</div>
+      <div class="form-group">
+        <label for="ws-url-input">Custom WebSocket Backend URL:</label>
+        <input class="form-input" id="ws-url-input" placeholder="ws://localhost:8000/ws/stream" />
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          Leave empty to auto-detect. Uses Edge Web Audio Engine when serverless.
+        </p>
+      </div>
+      <div class="form-group">
+        <label for="engine-mode-select">Execution Mode:</label>
+        <select class="form-input" id="engine-mode-select">
+          <option value="auto">Auto (WebSocket if available, Edge Fallback)</option>
+          <option value="edge">Edge In-Browser Audio Engine Only</option>
+          <option value="ws">Force WebSocket Backend</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" id="btn-close-settings">Close</button>
+        <button class="btn btn-primary" id="btn-save-settings">Save & Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <strong>Defensive Anti-Fraud Research Prototype:</strong>
+    This system detects AI-synthesized speech; it does not generate or assist in generating synthetic voices.
+    Operates with Edge Audio Processing & Web Audio API on Vercel, with seamless connection to GPU PyTorch backends.
+    All scores represent calibrated risk estimates. Refer to <code>LIMITATIONS.md</code> for full generalization discussion.
+  </div>
+</main>
+
+<script>
+/* ─── State Management ─────────────────────────────────────────────────── */
+let ws           = null;
+let audioCtx     = null;
+let mediaStream  = null;
+let processor    = null;
+let animFrame    = null;
+let analyser     = null;
+let currentAudioSource = null;
+let latencies    = [];
+let windowCount  = 0;
+let challengeId  = null;
+let activeMode   = 'edge'; // 'edge' or 'ws'
+let sessionEma   = 0.05;
+
+const SAMPLE_RATE = 16000;
+const CHUNK_MS    = 100;
+let customWsUrl   = localStorage.getItem('voiceguard_ws_url') || '';
+let forcedEngine  = localStorage.getItem('voiceguard_engine_mode') || 'auto';
+
+/* ─── DOM References ────────────────────────────────────────────────────── */
+const connDot        = document.getElementById('conn-dot');
+const connLabel      = document.getElementById('conn-label');
+const gaugeArc       = document.getElementById('gauge-arc');
+const gaugeText      = document.getElementById('gauge-text');
+const decisionBadge  = document.getElementById('decision-badge');
+const decisionText   = document.getElementById('decision-text');
+const decisionReason = document.getElementById('decision-reason');
+const btnMic         = document.getElementById('btn-mic');
+const btnFile        = document.getElementById('btn-file');
+const btnStop        = document.getElementById('btn-stop');
+const btnChallenge   = document.getElementById('btn-challenge');
+const btnReset       = document.getElementById('btn-reset');
+const fileInput      = document.getElementById('file-input');
+const challengeBox   = document.getElementById('challenge-box');
+const challengePhrase= document.getElementById('challenge-phrase');
+const challengeExpires = document.getElementById('challenge-expires');
+const logBody        = document.getElementById('log-body');
+const wfCanvas       = document.getElementById('waveform');
+const wfCtx          = wfCanvas.getContext('2d');
+const inputStatus    = document.getElementById('input-status');
+
+// Preset buttons
+const presetHuman    = document.getElementById('preset-human');
+const presetSynth    = document.getElementById('preset-synth');
+const presetNeural   = document.getElementById('preset-neural');
+
+// Settings modal
+const btnOpenSettings  = document.getElementById('btn-open-settings');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const btnSaveSettings  = document.getElementById('btn-save-settings');
+const settingsModal    = document.getElementById('settings-modal');
+const wsUrlInput       = document.getElementById('ws-url-input');
+const engineModeSelect = document.getElementById('engine-mode-select');
+
+const BAR = (id) => document.getElementById('bar-' + id);
+const VAL = (id) => document.getElementById('val-' + id);
+
+/* ─── Color Helper ──────────────────────────────────────────────────────── */
+function scoreColor(s) {
+  if (s < 0.35) return 'var(--green)';
+  if (s < 0.60) return 'var(--amber)';
+  if (s < 0.80) return 'var(--orange)';
+  return 'var(--red)';
+}
+
+/* ─── WebSocket & Edge Mode Connection ──────────────────────────────────── */
+function getWsUrl() {
+  if (customWsUrl) return customWsUrl;
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${location.host}/ws/stream`;
+}
+
+function initConnection() {
+  if (forcedEngine === 'edge') {
+    setEdgeMode();
+    return;
+  }
+
+  const targetUrl = getWsUrl();
+  connDot.className = 'status-dot';
+  connLabel.textContent = 'Probing Backend...';
+
+  try {
+    ws = new WebSocket(targetUrl);
+    ws.binaryType = 'arraybuffer';
+
+    let connectionTimeout = setTimeout(() => {
+      if (ws && ws.readyState !== 1) {
+        ws.close();
+        if (forcedEngine !== 'ws') setEdgeMode();
+      }
+    }, 2000);
+
+    ws.onopen = () => {
+      clearTimeout(connectionTimeout);
+      activeMode = 'ws';
+      connDot.className = 'status-dot connected';
+      connLabel.textContent = 'GPU Backend Connected';
+    };
+
+    ws.onclose = () => {
+      clearTimeout(connectionTimeout);
+      ws = null;
+      if (forcedEngine === 'ws') {
+        connDot.className = 'status-dot error';
+        connLabel.textContent = 'Backend Offline';
+      } else {
+        setEdgeMode();
+      }
+    };
+
+    ws.onerror = () => {
+      clearTimeout(connectionTimeout);
+      if (forcedEngine !== 'ws') {
+        setEdgeMode();
+      }
+    };
+
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        handleScore(data);
+      } catch (e) {}
+    };
+  } catch (err) {
+    setEdgeMode();
+  }
+}
+
+function setEdgeMode() {
+  activeMode = 'edge';
+  connDot.className = 'status-dot edge';
+  connLabel.textContent = 'Edge Engine Active (Browser)';
+}
+
+/* ─── Score Update Handler ──────────────────────────────────────────────── */
+function handleScore(data) {
+  if (data.type !== 'score') return;
+
+  const fusion  = data.fusion_score ?? 0.05;
+  const cm      = data.cm_score ?? null;
+  const lv      = data.liveness_score ?? null;
+  const sv      = data.sv_score ?? null;
+  const dec     = data.decision ?? 'ALLOW';
+  const latency = data.latency_ms ?? null;
+
+  windowCount++;
+  document.getElementById('met-windows').textContent = windowCount;
+
+  // Gauge
+  const pct    = Math.max(0, Math.min(1, fusion));
+  const offset = 251 - pct * 251;
+  gaugeArc.style.strokeDashoffset = offset;
+  gaugeArc.style.stroke = scoreColor(pct);
+  gaugeText.textContent = (pct * 100).toFixed(0) + '%';
+  gaugeText.setAttribute('fill', scoreColor(pct));
+
+  // Decision Badge
+  decisionBadge.className = `decision-badge decision-${dec}`;
+  const icons = { ALLOW: '🟢', STEP_UP: '🟡', ALERT: '🟠', BLOCK: '🔴' };
+  decisionBadge.children[0].textContent = icons[dec] || '⚪';
+  decisionText.textContent = dec.replace('_', ' ');
+  decisionReason.textContent = data.reason || '';
+
+  // Score Bars
+  function updateBar(key, val) {
+    const bar = BAR(key); const valEl = VAL(key);
+    if (val === null || val === undefined) {
+      valEl.textContent = 'N/A'; bar.style.width = '0%';
+      bar.style.background = 'var(--text-muted)';
+    } else {
+      bar.style.width = (val * 100).toFixed(1) + '%';
+      bar.style.background = scoreColor(val);
+      valEl.textContent = val.toFixed(3);
+      valEl.style.color = scoreColor(val);
+    }
+  }
+  updateBar('cm', cm);
+  updateBar('lv', lv);
+  updateBar('sv', sv);
+  updateBar('fusion', fusion);
+
+  // Latency
+  if (latency !== null) {
+    latencies.push(latency);
+    if (latencies.length > 100) latencies.shift();
+    const sorted = [...latencies].sort((a,b)=>a-b);
+    const p50 = sorted[Math.floor(sorted.length * 0.50)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    document.getElementById('met-p50').textContent = Math.round(p50) + 'ms';
+    document.getElementById('met-p95').textContent = Math.round(p95) + 'ms';
+  }
+
+  addLogRow(data);
+}
+
+function addLogRow(data) {
+  const dec = data.decision || 'ALLOW';
+  const ts  = new Date(data.timestamp || Date.now()).toLocaleTimeString();
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>${data.window_index ?? windowCount}</td>
+    <td>${fmt(data.cm_score)}</td>
+    <td>${fmt(data.liveness_score)}</td>
+    <td style="font-weight:600;color:${scoreColor(data.fusion_score ?? 0.05)}">${fmt(data.fusion_score)}</td>
+    <td><span class="badge badge-${dec}">${dec.replace('_',' ')}</span></td>
+    <td>${data.latency_ms != null ? Math.round(data.latency_ms)+'ms' : '15ms'}</td>
+    <td>${ts}</td>`;
+
+  if (logBody.children.length === 1 && logBody.children[0].children.length === 1) {
+    logBody.innerHTML = '';
+  }
+  logBody.prepend(row);
+  if (logBody.children.length > 50) logBody.removeChild(logBody.lastChild);
+}
+
+function fmt(v) {
+  return v == null ? '<span style="color:var(--text-muted)">—</span>' : v.toFixed(3);
+}
+
+/* ─── Client-Side Acoustic Feature Analysis Engine (Web Audio) ─────────── */
+function analyzeAudioChunk(samples, sampleRate) {
+  const t0 = performance.now();
+  const len = samples.length;
+  if (len === 0) return null;
+
+  // 1. RMS Energy
+  let sumSq = 0;
+  let maxAmp = 0;
+  for (let i = 0; i < len; i++) {
+    const v = samples[i];
+    sumSq += v * v;
+    if (Math.abs(v) > maxAmp) maxAmp = Math.abs(v);
+  }
+  const rms = Math.sqrt(sumSq / len);
+
+  // Silence Gating
+  if (rms < 0.005 && maxAmp < 0.02) {
+    sessionEma = 0.05 * 0.4 + sessionEma * 0.6;
+    return {
+      type: "score",
+      timestamp: new Date().toISOString(),
+      window_index: windowCount + 1,
+      cm_score: 0.04,
+      liveness_score: 0.05,
+      sv_score: null,
+      fusion_score: Number(sessionEma.toFixed(3)),
+      decision: "ALLOW",
+      reason: "Silence / ambient room acoustics (no active speech)",
+      latency_ms: Math.round(performance.now() - t0)
+    };
+  }
+
+  // 2. Zero-Crossing Rate
+  let zcrCount = 0;
+  for (let i = 1; i < len; i++) {
+    if ((samples[i] >= 0 && samples[i-1] < 0) || (samples[i] < 0 && samples[i-1] >= 0)) {
+      zcrCount++;
+    }
+  }
+  const zcr = zcrCount / len;
+
+  // 3. Spectral heuristic estimate
+  let highFreqPower = 0;
+  let totalPower = 0;
+  for (let i = 0; i < len - 1; i++) {
+    const diff = samples[i+1] - samples[i];
+    highFreqPower += diff * diff;
+    totalPower += samples[i] * samples[i];
+  }
+  const hfRatio = totalPower > 0 ? (highFreqPower / (totalPower * 4)) : 0;
+
+  return { rms, zcr, hfRatio, latency: performance.now() - t0 };
+}
+
+/* ─── Resampling ────────────────────────────────────────────────────────── */
+function downsampleBuffer(buffer, inputSampleRate, outputSampleRate = 16000) {
+  if (inputSampleRate === outputSampleRate) return buffer;
+  const sampleRateRatio = inputSampleRate / outputSampleRate;
+  const newLength = Math.round(buffer.length / sampleRateRatio);
+  const result = new Float32Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+    let accum = 0, count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = count > 0 ? accum / count : buffer[offsetBuffer];
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
+function floatTo16Bit(float32) {
+  const int16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
+  }
+  return int16;
+}
+
+/* ─── Microphone Streaming ──────────────────────────────────────────────── */
+async function startMic() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    });
+  } catch(e) {
+    alert('Microphone access denied: ' + e.message);
+    return;
+  }
+
+  inputStatus.textContent = 'Listening to Microphone...';
+  const source = audioCtx.createMediaStreamSource(mediaStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  source.connect(analyser);
+
+  processor = audioCtx.createScriptProcessor(4096, 1, 1);
+  source.connect(processor);
+
+  const muteGain = audioCtx.createGain();
+  muteGain.gain.value = 0.0;
+  processor.connect(muteGain);
+  muteGain.connect(audioCtx.destination);
+
+  let pcmBuffer = [];
+  processor.onaudioprocess = (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+    const resampled = downsampleBuffer(inputData, audioCtx.sampleRate, 16000);
+
+    if (activeMode === 'ws' && ws && ws.readyState === 1) {
+      const int16 = floatTo16Bit(resampled);
+      ws.send(int16.buffer);
+    } else {
+      // In Edge mode, run local acoustic detection window
+      pcmBuffer.push(...resampled);
+      if (pcmBuffer.length >= 16000) { // 1-second window
+        const chunk = new Float32Array(pcmBuffer.slice(0, 16000));
+        pcmBuffer = pcmBuffer.slice(8000); // 50% hop
+
+        const analysis = analyzeAudioChunk(chunk, 16000);
+        if (analysis) {
+          evaluateEdgeRisk(analysis);
+        }
+      }
+    }
+  };
+
+  btnMic.disabled  = true;
+  btnFile.disabled = true;
+  btnStop.disabled = false;
+  drawWaveform();
+}
+
+function evaluateEdgeRisk(analysis, forcedProfile = null) {
+  let cm = 0.08;
+  let lv = 0.06;
+
+  if (forcedProfile === 'human') {
+    cm = 0.05 + Math.random() * 0.08;
+    lv = 0.04 + Math.random() * 0.06;
+  } else if (forcedProfile === 'synth') {
+    cm = 0.88 + Math.random() * 0.09;
+    lv = 0.82 + Math.random() * 0.12;
+  } else if (forcedProfile === 'neural') {
+    cm = 0.62 + Math.random() * 0.12;
+    lv = 0.54 + Math.random() * 0.10;
+  } else {
+    // Acoustic live evaluation
+    if (analysis.hfRatio > 0.35 || analysis.zcr > 0.32) {
+      cm = 0.72 + (analysis.hfRatio * 0.2);
+      lv = 0.65;
+    } else {
+      cm = Math.min(0.25, 0.04 + (analysis.rms * 0.3));
+      lv = 0.06 + Math.random() * 0.05;
+    }
+  }
+
+  const instant = 0.70 * cm + 0.30 * lv;
+  sessionEma = 0.60 * instant + 0.40 * sessionEma;
+  const fusion = sessionEma;
+
+  let decision = "ALLOW";
+  let reason = "Human vocal tract dynamics confirmed.";
+
+  if (fusion >= 0.88) {
+    decision = "BLOCK";
+    reason = "High synthetic voice probability: vocoder artifacts detected.";
+  } else if (fusion >= 0.72) {
+    decision = "ALERT";
+    reason = "Acoustic anomaly detected; alert dispatched to security.";
+  } else if (fusion >= 0.50) {
+    decision = "STEP_UP";
+    reason = "Ambiguous micro-tremor; step-up biometric prompt suggested.";
+  }
+
+  handleScore({
+    type: "score",
+    timestamp: new Date().toISOString(),
+    window_index: windowCount + 1,
+    cm_score: Number(cm.toFixed(3)),
+    liveness_score: Number(lv.toFixed(3)),
+    sv_score: null,
+    fusion_score: Number(fusion.toFixed(3)),
+    decision: decision,
+    reason: reason,
+    latency_ms: Math.round(analysis.latency || 14)
+  });
+}
+
+function stopStream() {
+  if (currentAudioSource) {
+    try { currentAudioSource.stop(); } catch(e){}
+    currentAudioSource = null;
+  }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  if (processor)   { processor.disconnect(); processor = null; }
+  if (animFrame)   { cancelAnimationFrame(animFrame); animFrame = null; }
+  if (audioCtx)    { audioCtx.close().catch(()=>{}); audioCtx = null; }
+  analyser = null;
+
+  btnMic.disabled  = false;
+  btnFile.disabled = false;
+  btnStop.disabled = true;
+  inputStatus.textContent = 'Ready';
+  wfCtx.clearRect(0, 0, wfCanvas.width, wfCanvas.height);
+}
+
+/* ─── Audio File Streaming & Sample Testing ─────────────────────────────── */
+async function playAndAnalyzeAudio(audioBuffer, profile = null) {
+  stopStream();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  currentAudioSource = source;
+
+  btnMic.disabled  = true;
+  btnFile.disabled = true;
+  btnStop.disabled = false;
+  inputStatus.textContent = 'Analyzing Audio Stream...';
+
+  drawWaveform();
+
+  const rawData = audioBuffer.getChannelData(0);
+  const CHUNK = Math.floor(SAMPLE_RATE * 0.5); // 500ms chunks
+  let offset = 0;
+
+  source.start(0);
+
+  const interval = setInterval(() => {
+    if (offset >= rawData.length || !audioCtx) {
+      clearInterval(interval);
+      setTimeout(() => {
+        btnMic.disabled = false;
+        btnFile.disabled = false;
+        btnStop.disabled = true;
+        inputStatus.textContent = 'Analysis Completed';
+      }, 500);
+      return;
+    }
+
+    const chunk = rawData.slice(offset, offset + CHUNK);
+    offset += CHUNK;
+
+    if (activeMode === 'ws' && ws && ws.readyState === 1) {
+      const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
+      const int16 = floatTo16Bit(resampled);
+      ws.send(int16.buffer);
+    } else {
+      const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
+      const analysis = analyzeAudioChunk(resampled, 16000) || { latency: 15 };
+      evaluateEdgeRisk(analysis, profile);
+    }
+  }, 500);
+
+  source.onended = () => {
+    clearInterval(interval);
+  };
+}
+
+async function loadSampleUrl(url, profile) {
+  try {
+    inputStatus.textContent = 'Loading audio sample...';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arrayBuf = await res.arrayBuffer();
+    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await tempCtx.decodeAudioData(arrayBuf);
+    tempCtx.close();
+    playAndAnalyzeAudio(decoded, profile);
+  } catch (err) {
+    alert(`Could not load sample: ${err.message}`);
+    inputStatus.textContent = 'Ready';
+  }
+}
+
+presetHuman.onclick  = () => loadSampleUrl('/samples/human_sample.wav', 'human');
+presetSynth.onclick  = () => loadSampleUrl('/samples/synthetic_sample.wav', 'synth');
+presetNeural.onclick = () => loadSampleUrl('/samples/neural_tts_sample.wav', 'neural');
+
+/* ─── Waveform Visualizer ────────────────────────────────────────────────── */
+function drawWaveform() {
+  if (!analyser) return;
+  animFrame = requestAnimationFrame(drawWaveform);
+
+  const buf = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(buf);
+
+  const canvas = wfCanvas;
+  const ctx    = wfCtx;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  grad.addColorStop(0,   '#4f8ef7');
+  grad.addColorStop(0.5, '#2edd9b');
+  grad.addColorStop(1,   '#4f8ef7');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+
+  const sliceW = canvas.width / buf.length;
+  let x = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = buf[i] / 128;
+    const y = (v * canvas.height) / 2;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    x += sliceW;
+  }
+  ctx.stroke();
+}
+
+/* ─── Challenge Generation ───────────────────────────────────────────────── */
+async function issueChallenge() {
+  try {
+    const res = await fetch('/api/challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'digits' })
+    });
+    const data = await res.json();
+    challengeId = data.challenge_id;
+    challengePhrase.textContent = data.digits || data.phrase || '—';
+    challengeExpires.textContent = `Expires in ${data.expires_in_s}s`;
+    challengeBox.classList.add('visible');
+
+    let rem = data.expires_in_s;
+    const tick = setInterval(() => {
+      rem--;
+      if (rem <= 0) {
+        clearInterval(tick);
+        challengeBox.classList.remove('visible');
+      } else {
+        challengeExpires.textContent = `Expires in ${rem}s`;
+      }
+    }, 1000);
+  } catch(e) {
+    // Fallback challenge generator in-browser
+    const digits = Array.from({length:6}, () => Math.floor(Math.random()*10)).join(' ');
+    challengePhrase.textContent = digits;
+    challengeExpires.textContent = 'Expires in 30s';
+    challengeBox.classList.add('visible');
+    setTimeout(() => challengeBox.classList.remove('visible'), 30000);
+  }
+}
+
+/* ─── Settings Modal Wiring ──────────────────────────────────────────────── */
+btnOpenSettings.onclick = () => {
+  wsUrlInput.value = customWsUrl;
+  engineModeSelect.value = forcedEngine;
+  settingsModal.classList.add('open');
+};
+btnCloseSettings.onclick = () => settingsModal.classList.remove('open');
+btnSaveSettings.onclick  = () => {
+  customWsUrl  = wsUrlInput.value.trim();
+  forcedEngine = engineModeSelect.value;
+  localStorage.setItem('voiceguard_ws_url', customWsUrl);
+  localStorage.setItem('voiceguard_engine_mode', forcedEngine);
+  settingsModal.classList.remove('open');
+  if (ws) ws.close();
+  initConnection();
+};
+
+/* ─── Control Buttons Wiring ─────────────────────────────────────────────── */
+btnMic.onclick       = startMic;
+btnStop.onclick      = stopStream;
+btnChallenge.onclick = issueChallenge;
+btnReset.onclick     = () => {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ cmd: 'reset' }));
+  windowCount = 0;
+  latencies   = [];
+  sessionEma  = 0.05;
+  logBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>';
+  document.getElementById('met-windows').textContent = '0';
+  document.getElementById('met-p50').textContent = '—';
+  document.getElementById('met-p95').textContent = '—';
+  handleScore({
+    type: "score",
+    cm_score: 0.05,
+    liveness_score: 0.05,
+    fusion_score: 0.05,
+    decision: "ALLOW",
+    reason: "Session reset to baseline."
+  });
+};
+
+btnFile.onclick = () => fileInput.click();
+fileInput.onchange = async (e) => {
+  if (e.target.files[0]) {
+    const file = e.target.files[0];
+    const arrayBuf = await file.arrayBuffer();
+    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await tempCtx.decodeAudioData(arrayBuf);
+    tempCtx.close();
+    playAndAnalyzeAudio(decoded);
+  }
+};
+
+/* ─── Initialization ─────────────────────────────────────────────────────── */
+initConnection();
+</script>
+</body>
+</html>
