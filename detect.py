@@ -2,7 +2,8 @@
 detect.py — Phase 1 CLI entry point.
 
 Usage:
-    python detect.py <audio_file> [--model <checkpoint>] [--enroll <ref_audio>] [--verbose]
+    python detect.py <audio_file> [--model <checkpoint>] [--enroll <ref_audio>]
+                     [--analyst] [--verbose]
 
 Output (JSON to stdout):
     {
@@ -15,7 +16,16 @@ Output (JSON to stdout):
         "fusion_score": 0.87,
         "decision": "ALERT",
         "reason": "...",
-        "latency_ms": 142.3
+        "latency_ms": 142.3,
+        "analyst": {                  # only when --analyst is passed
+            "verdict": "Likely AI-generated",
+            "confidence": "High",
+            "key_evidence": [...],
+            "caveats": [...],
+            "quality_score": 0.71,
+            "latency_score": 0.35,
+            "overall_score": 0.60
+        }
     }
 
 Exit codes:
@@ -79,6 +89,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-liveness", action="store_true",
         help="Skip liveness analysis (faster)."
+    )
+    parser.add_argument(
+        "--analyst", action="store_true",
+        help="Run the Quality+Latency AI voice analyst and print a verdict report."
+    )
+    parser.add_argument(
+        "--response-times", default=None,
+        help="Comma-separated turn-to-turn response latencies in ms (for --analyst). "
+             "E.g. '120,118,125,119'"
+    )
+    parser.add_argument(
+        "--words-per-window", default=None,
+        help="Comma-separated words-per-second values per streaming window (for --analyst). "
+             "E.g. '4.2,4.1,4.3,4.0'"
+    )
+    parser.add_argument(
+        "--transcript", default=None,
+        help="Optional transcript text for filler-word / self-correction analysis (for --analyst)."
     )
     parser.add_argument(
         "--json", action="store_true",
@@ -235,6 +263,37 @@ def main() -> int:
         inference_latency_ms=latency_ms,
     ))
 
+    # ── Step 9: Quality + Latency Analyst (optional) ─────────────────
+    analyst_report = None
+    if args.analyst:
+        from src.quality_latency_analyst import QualityLatencyAnalyst, LatencyProfile
+        from src.verdict import build_verdict, render_verdict_rich
+
+        # Parse optional timing data from CLI flags
+        resp_times: list = []
+        if args.response_times:
+            try:
+                resp_times = [float(x.strip()) for x in args.response_times.split(",") if x.strip()]
+            except ValueError:
+                logging.warning("--response-times could not be parsed; ignoring.")
+
+        wps_values: list = []
+        if args.words_per_window:
+            try:
+                wps_values = [float(x.strip()) for x in args.words_per_window.split(",") if x.strip()]
+            except ValueError:
+                logging.warning("--words-per-window could not be parsed; ignoring.")
+
+        lp = LatencyProfile(
+            response_times_ms=resp_times,
+            words_per_window=wps_values,
+            transcript=args.transcript,
+        )
+
+        analyst = QualityLatencyAnalyst()
+        ql_result = analyst.analyze(waveform, latency_profile=lp)
+        analyst_report = build_verdict(ql_result)
+
     # ── Output ────────────────────────────────────────────────────────────
     label = "SYNTHETIC" if fusion_score >= 0.5 else "BONA FIDE"
     result = {
@@ -249,6 +308,8 @@ def main() -> int:
         "reason":         decision.reason,
         "latency_ms":     round(latency_ms, 1),
     }
+    if analyst_report:
+        result["analyst"] = analyst_report.to_dict()
 
     if args.json:
         print(json.dumps(result, indent=2))
@@ -300,6 +361,12 @@ def main() -> int:
             title="[bold]Verdict",
             border_style=dec_color,
         ))
+
+        # ── Analyst report (rich) ─────────────────────────────────────
+        if analyst_report:
+            console.print()
+            from src.verdict import render_verdict_rich
+            render_verdict_rich(analyst_report)
 
     return EXIT_CODES.get(decision.action.value, 0)
 

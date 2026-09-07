@@ -1,0 +1,102 @@
+{
+  "_comment": "VoiceGuard CM Classifier — Benchmark Results (ASVspoof 2019 LA)",
+  "_note": "These are published SOTA reference numbers. Replace with your trained model's results after running: python training/eval_eer.py",
+  "_source": "ASVspoof 2019 LA Evaluation Partition, media-sec-lab survey baselines",
+
+  "model": "VoiceGuard CM (LogMel + WavLM, AASIST-lite variant)",
+  "dataset": "ASVspoof 2019 LA",
+  "split": "eval",
+  "n_bonafide": 7355,
+  "n_spoof": 63882,
+
+  "results": {
+    "voiceguard_cm": {
+      "name": "VoiceGuard CM (LogMel + WavLM)",
+      "eer": null,
+      "min_tDCF": null,
+      "note": "Run python training/eval_eer.py after training to populate"
+    },
+    "aasist": {
+      "name": "AASIST (published, Jung et al. 2022)",
+      "eer": 0.83,
+      "min_tDCF": 0.0275,
+      "paper": "https://arxiv.org/abs/2110.01200",
+      "code": "https://github.com/clovaai/aasist"
+    },
+    "rawnet2": {
+      "name": "RawNet2 (published, Tak et al. 2021)",
+      "eer": 1.12,
+      "min_tDCF": 0.0335,
+      "paper": "https://arxiv.org/abs/2011.01108",
+      "code": "https://github.com/eurecom-asp/rawnet2-antispoofing"
+    },
+    "lfcc_lcnn": {
+      "name": "LFCC-LCNN (baseline)",
+      "eer": 2.19,
+      "min_tDCF": 0.0663,
+      "paper": "https://arxiv.org/abs/2009.09637"
+    },
+    "sincnet": {
+      "name": "SincNet front-end (Ravanelli & Bengio 2019)",
+      "eer": 3.54,
+      "min_tDCF": 0.1095,
+      "paper": "https://arxiv.org/abs/1907.12908",
+      "code": "https://github.com/mravanelli/SincNet"
+    }
+  },
+
+  "datasets_reference": [
+    {
+      "name": "ASVspoof 2019 LA",
+      "description": "19 TTS/VC attack systems, controlled conditions",
+      "n_bonafide_train": 2580,
+      "n_spoof_train": 22800,
+      "n_bonafide_eval": 7355,
+      "n_spoof_eval": 63882,
+      "paper": "https://arxiv.org/abs/1904.05441",
+      "dataset": "https://datashare.ed.ac.uk/handle/10283/3336"
+    },
+    {
+      "name": "ASVspoof 2021 LA/DF",
+      "description": "Real telephony/codec conditions + broader deepfake attacks",
+      "paper": "https://arxiv.org/abs/2109.00535",
+      "dataset": "https://www.asvspoof.org/index2021.html"
+    },
+    {
+      "name": "WaveFake",
+      "description": "6 neural vocoders applied to LJSpeech — ~117K utterances",
+      "n_bonafide": 15440,
+      "n_spoof": 102000,
+      "paper": "https://arxiv.org/abs/2111.02813",
+      "dataset": "https://zenodo.org/record/5642694"
+    },
+    {
+      "name": "In-the-Wild",
+      "description": "Real-world AI audio from the internet — Fraunhofer AISEC",
+      "n_bonafide": 19963,
+      "n_spoof": 11816,
+      "paper": "https://arxiv.org/abs/2203.16263",
+      "dataset": "https://deepfake-demo.aisec.fraunhofer.de/in_the_wild"
+    },
+    {
+      "name": "MLAAD v3",
+      "description": "23 TTS systems, 38 languages — Multi-Language Audio Anti-Spoofing",
+      "paper": "https://arxiv.org/abs/2401.09512",
+      "dataset": "https://deepfake-total.com/mlaad"
+    },
+    {
+      "name": "FakeAVCeleb",
+      "description": "Celebrity deepfake audio+video, real-world identities",
+      "paper": "https://arxiv.org/pdf/2108.05080",
+      "dataset": "https://github.com/DASH-Lab/FakeAVCeleb"
+    },
+    {
+      "name": "FMFCC-A",
+      "description": "Chinese-language fake audio challenge dataset",
+      "paper": "https://arxiv.org/abs/2110.09441",
+      "dataset": "https://github.com/Amforever/FMFCC-A"
+    }
+  ],
+
+  "generated_at": "2026-09-07T00:00:00Z"
+}

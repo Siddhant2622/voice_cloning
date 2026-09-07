@@ -1,0 +1,136 @@
+name: "🚀 Train VoiceGuard CM on GitHub Actions"
+
+on:
+  # Manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: "Number of training epochs"
+        default: "50"
+        required: false
+      hf_repo:
+        description: "Hugging Face repo ID to push checkpoint (e.g. username/voiceguard-cm)"
+        default: ""
+        required: false
+
+  # Auto-trigger when training config changes
+  push:
+    branches: [main]
+    paths:
+      - "training/train_cm.py"
+      - "src/models/cm_classifier.py"
+      - "src/features.py"
+
+jobs:
+  train:
+    name: "Train CM Classifier"
+    # GitHub-hosted runner with GPU (requires GitHub Team plan)
+    # For free tier, use CPU (slower but works)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: "Install dependencies"
+        run: |
+          pip install --upgrade pip
+          pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install huggingface_hub
+
+      - name: "Restore cached dataset"
+        id: cache-dataset
+        uses: actions/cache@v4
+        with:
+          path: data/asvspoof2019_la
+          key: asvspoof2019-la-v1
+
+      - name: "Download & prepare ASVspoof 2019 LA (if not cached)"
+        if: steps.cache-dataset.outputs.cache-hit != 'true'
+        env:
+          ZENODO_URL: "https://zenodo.org/record/5105682/files"
+        run: |
+          mkdir -p data/asvspoof2019_la
+          echo "Downloading ASVspoof 2019 LA from Zenodo..."
+          wget -q --show-progress "$ZENODO_URL/ASVspoof2019_LA_cm_protocols.zip" -P data/asvspoof2019_la/
+          wget -q --show-progress "$ZENODO_URL/ASVspoof2019_LA_train.zip"        -P data/asvspoof2019_la/
+          wget -q --show-progress "$ZENODO_URL/ASVspoof2019_LA_dev.zip"          -P data/asvspoof2019_la/
+          wget -q --show-progress "$ZENODO_URL/ASVspoof2019_LA_eval.zip"         -P data/asvspoof2019_la/
+          cd data/asvspoof2019_la
+          for f in *.zip; do unzip -q "$f" && echo "✓ Extracted $f"; done
+
+      - name: "Prepare dataset (protocol → CSV)"
+        run: |
+          python data/prepare_asvspoof.py \
+            --dir data/asvspoof2019_la \
+            --out data/asvspoof2019_prepared \
+            --split all
+
+      - name: "Train CM classifier"
+        run: |
+          mkdir -p models
+          python training/train_cm.py \
+            --data   data/asvspoof2019_prepared/train \
+            --val-data data/asvspoof2019_prepared/dev \
+            --epochs ${{ github.event.inputs.epochs || '50' }} \
+            --lr     0.0003 \
+            --batch  32 \
+            --out    models/cm_asvspoof19.pt \
+            --augment rawboost \
+            --amp
+          echo "✓ Training complete"
+
+      - name: "Evaluate EER on eval partition"
+        run: |
+          mkdir -p results
+          python training/eval_eer.py \
+            --data       data/asvspoof2019_prepared/eval \
+            --checkpoint models/cm_asvspoof19.pt \
+            --out        results/benchmark_asvspoof19.json
+          cat results/benchmark_asvspoof19.json
+
+      - name: "Push checkpoint to Hugging Face Hub"
+        if: "${{ github.event.inputs.hf_repo != '' || secrets.HF_REPO_ID != '' }}"
+        env:
+          HF_TOKEN:   ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ github.event.inputs.hf_repo || secrets.HF_REPO_ID }}
+        run: |
+          python data/download_datasets.py \
+            --hf-push   "$HF_REPO_ID" \
+            --checkpoint models/cm_asvspoof19.pt \
+            --hf-token  "$HF_TOKEN"
+          echo "✓ Checkpoint → https://huggingface.co/$HF_REPO_ID"
+
+      - name: "Upload checkpoint as GitHub artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: "voiceguard-cm-checkpoint"
+          path: models/cm_asvspoof19.pt
+          retention-days: 30
+
+      - name: "Commit benchmark results to repo"
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: update ASVspoof2019 LA benchmark results [skip ci]"
+          file_pattern: "results/*.json"
+
+      - name: "Post training summary"
+        run: |
+          echo "## Training Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json
+          with open('results/benchmark_asvspoof19.json') as f:
+              d = json.load(f)
+          for k, v in d.items():
+              print(f'| {k} | {v} |')
+          " >> $GITHUB_STEP_SUMMARY

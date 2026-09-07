@@ -327,7 +327,245 @@
       display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       background: var(--red); animation: pulse 1s infinite; margin-right: 6px;
     }
+
+    /* ─── AI Voice Analyst Panel ─────────────────────────────────────────── */
+    .analyst-verdict-card {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+      border-radius: var(--radius); padding: 20px 24px; margin-bottom: 18px;
+      border: 1.5px solid; transition: all 0.35s;
+    }
+    .analyst-verdict-idle   { border-color: var(--border);  background: rgba(14,22,38,0.5); }
+    .analyst-verdict-ai     { border-color: rgba(247,79,106,0.55);  background: rgba(247,79,106,0.08); box-shadow: 0 0 24px rgba(247,79,106,0.18); }
+    .analyst-verdict-human  { border-color: rgba(46,221,155,0.55);  background: rgba(46,221,155,0.08); box-shadow: 0 0 24px rgba(46,221,155,0.15); }
+    .analyst-verdict-uncertain { border-color: rgba(245,197,66,0.55); background: rgba(245,197,66,0.08); box-shadow: 0 0 24px rgba(245,197,66,0.15); }
+
+    .analyst-verdict-left { display: flex; flex-direction: column; gap: 8px; }
+    .analyst-verdict-badge {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.3px;
+      transition: color 0.3s;
+    }
+    .analyst-verdict-ai .analyst-verdict-badge     { color: var(--red); }
+    .analyst-verdict-human .analyst-verdict-badge  { color: var(--green); }
+    .analyst-verdict-uncertain .analyst-verdict-badge { color: var(--amber); }
+    .analyst-verdict-idle .analyst-verdict-badge   { color: var(--text-muted); }
+
+    .analyst-confidence-chip {
+      display: inline-block; padding: 3px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      background: rgba(255,255,255,0.06); color: var(--text-muted);
+      transition: all 0.3s;
+    }
+    .conf-high   { background: rgba(46,221,155,0.18);  color: var(--green); }
+    .conf-medium { background: rgba(245,197,66,0.18);  color: var(--amber); }
+    .conf-low    { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+
+    .analyst-scores-grid {
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .analyst-mini-score { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .analyst-mini-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .analyst-mini-val   { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+    /* Accordions */
+    .analyst-accordions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .analyst-accordion  { border-radius: var(--radius-sm); border: 1px solid var(--border); overflow: hidden; }
+    .analyst-acc-header {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 18px; background: rgba(14,22,38,0.6);
+      font-size: 13px; font-weight: 600; color: var(--text-primary);
+      border: none; cursor: pointer; text-align: left; transition: background 0.2s;
+    }
+    .analyst-acc-header:hover { background: rgba(79,142,247,0.08); }
+    .analyst-acc-arrow { font-size: 11px; color: var(--text-muted); }
+    .analyst-acc-body  {
+      max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+      background: rgba(8,12,20,0.5);
+      padding: 0;
+    }
+
+    /* Signal rows */
+    .analyst-signal-row {
+      display: grid;
+      grid-template-columns: 160px 1fr 52px;
+      grid-template-rows: auto auto;
+      align-items: center; column-gap: 14px; row-gap: 2px;
+      padding: 10px 18px;
+      border-bottom: 1px solid rgba(78,143,247,0.06);
+    }
+    .analyst-signal-row:last-child { border-bottom: none; }
+    .analyst-sig-name  { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .analyst-sig-val   { font-size: 12px; font-family: 'JetBrains Mono', monospace; text-align: right; }
+    .analyst-sig-detail {
+      grid-column: 1 / -1; font-size: 11px; color: var(--text-muted);
+      padding-left: 0; padding-top: 2px;
+    }
+    .analyst-bar-bg  {
+      height: 6px; background: rgba(255,255,255,0.06);
+      border-radius: 3px; overflow: hidden;
+    }
+    .analyst-bar-fill {
+      height: 100%; width: 0; border-radius: 3px;
+      transition: width 0.5s cubic-bezier(.4,0,.2,1), background 0.3s;
+    }
+
+    /* Evidence & Caveats */
+    .analyst-evidence-box, .analyst-caveats-box {
+      border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 14px;
+    }
+    .analyst-evidence-box { background: rgba(79,142,247,0.07); border: 1px solid rgba(79,142,247,0.2); }
+    .analyst-caveats-box  { background: rgba(245,197,66,0.07); border: 1px solid rgba(245,197,66,0.22); }
+    .analyst-evidence-title { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+    .analyst-caveats-title  { font-size: 12px; font-weight: 700; color: var(--amber); margin-bottom: 10px; }
+    .analyst-evidence-list, .analyst-caveats-list {
+      list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;
+    }
+    .analyst-evidence-list li, .analyst-caveats-list li {
+      font-size: 12px; line-height: 1.6;
+      padding-left: 16px; position: relative;
+    }
+    .analyst-evidence-list li::before { content: '•'; position: absolute; left: 0; }
+    .analyst-caveats-list  li { color: var(--amber); }
+    .analyst-caveats-list  li::before { content: '⚠'; position: absolute; left: 0; font-size: 10px; top: 1px; }
+
+    /* Latency inputs */
+    .analyst-inputs {
+      border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .analyst-input-row {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .analyst-input-row label {
+      font-size: 12px; color: var(--text-muted); white-space: nowrap; min-width: 220px;
+    }
+    .analyst-input-row .form-input { flex: 1; min-width: 140px; font-size: 12px; }
+
+    /* ─── Tab Navigation ─────────────────────────────────────────────────── */
+    .tab-nav {
+      display: flex; gap: 4px; background: rgba(14,22,38,0.7);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 5px; margin-bottom: 28px;
+      backdrop-filter: blur(12px); flex-wrap: wrap;
+    }
+    .tab-btn {
+      flex: 1; min-width: 120px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 18px; border-radius: 10px; border: none;
+      background: transparent; color: var(--text-muted);
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.25s; white-space: nowrap;
+    }
+    .tab-btn:hover { background: rgba(79,142,247,0.1); color: var(--text-primary); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(79,142,247,0.25), rgba(46,221,155,0.12));
+      color: var(--accent);
+      box-shadow: 0 0 16px rgba(79,142,247,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .tab-badge {
+      background: var(--accent); color: #fff; border-radius: 20px;
+      font-size: 10px; font-weight: 700; padding: 1px 6px; min-width: 18px;
+      text-align: center;
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ─── Batch Analyzer Tab ──────────────────────────────────────────────── */
+    .dropzone {
+      border: 2px dashed var(--border-bright); border-radius: var(--radius);
+      padding: 48px 24px; text-align: center;
+      background: rgba(79,142,247,0.04);
+      transition: all 0.25s; cursor: pointer;
+    }
+    .dropzone.drag-over {
+      border-color: var(--accent); background: rgba(79,142,247,0.10);
+      box-shadow: 0 0 30px rgba(79,142,247,0.15);
+    }
+    .dropzone-icon { font-size: 48px; margin-bottom: 12px; }
+    .dropzone-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .dropzone-sub   { font-size: 13px; color: var(--text-muted); }
+    .batch-controls { display: flex; gap: 10px; align-items: center; margin: 16px 0; flex-wrap: wrap; }
+    .batch-table-wrap { overflow-x: auto; margin-top: 16px; }
+    .batch-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .batch-table th {
+      text-align: left; padding: 10px 14px;
+      background: rgba(14,22,38,0.8); color: var(--text-muted);
+      font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .batch-table td { padding: 10px 14px; border-bottom: 1px solid rgba(78,143,247,0.06); }
+    .batch-table tr:hover td { background: rgba(79,142,247,0.04); }
+    .verdict-pill {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .verdict-ai      { background: rgba(247,79,106,0.18); color: var(--red); border: 1px solid rgba(247,79,106,0.35); }
+    .verdict-human   { background: rgba(46,221,155,0.18);  color: var(--green); border: 1px solid rgba(46,221,155,0.35); }
+    .verdict-uncertain { background: rgba(245,197,66,0.18); color: var(--amber); border: 1px solid rgba(245,197,66,0.35); }
+    .verdict-pending { background: rgba(255,255,255,0.06); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ─── Benchmark Explorer Tab ──────────────────────────────────────────── */
+    .bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .bench-card {
+      border-radius: var(--radius); padding: 20px;
+      background: var(--bg-panel); border: 1px solid var(--border);
+      text-align: center; transition: all 0.25s;
+    }
+    .bench-card:hover { border-color: var(--border-bright); transform: translateY(-2px); }
+    .bench-card-val  { font-size: 28px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+    .bench-card-name { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+    .bench-card-note { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .chart-container { position: relative; height: 280px; margin-bottom: 24px; }
+    .dataset-cards { display: flex; flex-direction: column; gap: 10px; }
+    .ds-card {
+      display: grid; grid-template-columns: 180px 1fr auto;
+      align-items: center; gap: 16px;
+      padding: 14px 18px; border-radius: var(--radius-sm);
+      background: var(--bg-panel); border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+    .ds-card:hover { border-color: var(--border-bright); }
+    .ds-name   { font-size: 13px; font-weight: 700; }
+    .ds-desc   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .ds-pills  { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ds-pill   {
+      padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
+      background: rgba(79,142,247,0.12); color: var(--accent);
+      border: 1px solid rgba(79,142,247,0.25);
+    }
+    .ds-link {
+      padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      background: rgba(79,142,247,0.12); color: var(--accent); text-decoration: none;
+      border: 1px solid rgba(79,142,247,0.25); white-space: nowrap; transition: all 0.2s;
+    }
+    .ds-link:hover { background: rgba(79,142,247,0.25); }
+
+    /* ─── About Tab ──────────────────────────────────────────────────────── */
+    .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .about-grid { grid-template-columns: 1fr; } }
+    .arch-svg { width: 100%; max-width: 560px; display: block; margin: 0 auto; }
+    .paper-list { display: flex; flex-direction: column; gap: 10px; }
+    .paper-card {
+      padding: 14px 18px; border-radius: var(--radius-sm);
+      background: var(--bg-panel); border: 1px solid var(--border);
+    }
+    .paper-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .paper-card-authors { font-size: 11px; color: var(--text-muted); }
+    .paper-card-links { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .paper-link {
+      font-size: 10px; padding: 3px 10px; border-radius: 4px; text-decoration: none;
+      background: rgba(79,142,247,0.10); color: var(--accent);
+      border: 1px solid rgba(79,142,247,0.2); transition: all 0.2s;
+    }
+    .paper-link:hover { background: rgba(79,142,247,0.22); }
+    .stat-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .stat-pill {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    }
+    .stat-pill span { color: var(--accent); }
   </style>
+
 </head>
 <body>
 
@@ -350,16 +588,37 @@
     </div>
   </header>
 
+  <!-- Tab Navigation -->
+  <nav class="tab-nav" role="tablist" aria-label="VoiceGuard Sections">
+    <button class="tab-btn active" id="tab-live-btn"    onclick="switchTab('live')"    role="tab" aria-selected="true">
+      &#127910; Live Analysis
+    </button>
+    <button class="tab-btn"        id="tab-batch-btn"   onclick="switchTab('batch')"   role="tab" aria-selected="false">
+      &#128190; Batch Analyzer
+    </button>
+    <button class="tab-btn"        id="tab-bench-btn"   onclick="switchTab('bench')"   role="tab" aria-selected="false">
+      &#128202; Benchmark Explorer
+    </button>
+    <button class="tab-btn"        id="tab-about-btn"   onclick="switchTab('about')"   role="tab" aria-selected="false">
+      &#128218; About &amp; Research
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1: Live Analysis (existing content wrapped)                       -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-pane active" id="tab-live" role="tabpanel">
+
   <!-- Instant Sample Testing Presets -->
   <div class="preset-banner">
     <div class="preset-title">
-      <span>⚡ Instant Demo Samples:</span>
+      <span>&#9889; Instant Demo Samples:</span>
       <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Test the detection pipeline with 1 click</span>
     </div>
     <div class="preset-btns">
-      <button class="btn-preset" id="preset-human">👤 Genuine Human Voice</button>
-      <button class="btn-preset" id="preset-synth">🤖 AI Voice Clone</button>
-      <button class="btn-preset" id="preset-neural">⚡ Neural TTS</button>
+      <button class="btn-preset" id="preset-human">&#128100; Genuine Human Voice</button>
+      <button class="btn-preset" id="preset-synth">&#129302; AI Voice Clone</button>
+      <button class="btn-preset" id="preset-neural">&#9889; Neural TTS</button>
     </div>
   </div>
 
@@ -481,6 +740,170 @@
         <div class="challenge-expires" id="challenge-expires">Expires in 30s</div>
       </div>
     </div>
+
+    <!-- Full Width: AI Voice Analyst Panel -->
+    <div class="panel col-full" id="analyst-panel">
+      <div class="panel-title">
+        <span>🔍 AI Voice Analyst — Quality &amp; Latency</span>
+        <button class="btn btn-primary" id="btn-run-analyst" style="font-size:12px;padding:6px 16px;">▶ Run Analyst</button>
+      </div>
+
+      <!-- Verdict Card -->
+      <div id="analyst-verdict-card" class="analyst-verdict-card analyst-verdict-idle">
+        <div class="analyst-verdict-left">
+          <div class="analyst-verdict-badge" id="analyst-verdict-badge">—</div>
+          <div class="analyst-confidence-chip" id="analyst-confidence-chip">Awaiting analysis</div>
+        </div>
+        <div class="analyst-scores-grid">
+          <div class="analyst-mini-score">
+            <span class="analyst-mini-label">Quality Score</span>
+            <span class="analyst-mini-val" id="analyst-quality-val">—</span>
+          </div>
+          <div class="analyst-mini-score">
+            <span class="analyst-mini-label">Latency Score</span>
+            <span class="analyst-mini-val" id="analyst-latency-val">—</span>
+          </div>
+          <div class="analyst-mini-score">
+            <span class="analyst-mini-label">Overall Score</span>
+            <span class="analyst-mini-val" id="analyst-overall-val">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Signal Accordions -->
+      <div class="analyst-accordions">
+
+        <!-- Audio Quality Signals -->
+        <div class="analyst-accordion" id="acc-quality">
+          <button class="analyst-acc-header" onclick="toggleAcc('quality')">
+            <span>🎙 Audio Quality Signals</span>
+            <span class="analyst-acc-arrow" id="arr-quality">▼</span>
+          </button>
+          <div class="analyst-acc-body" id="body-quality">
+            <div class="analyst-signal-row" id="sig-prosody">
+              <span class="analyst-sig-name">Prosody Smoothness</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-prosody"></div></div>
+              <span class="analyst-sig-val" id="aval-prosody">—</span>
+              <span class="analyst-sig-detail" id="adet-prosody"></span>
+            </div>
+            <div class="analyst-signal-row" id="sig-breath">
+              <span class="analyst-sig-name">Breath &amp; Disfluency</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-breath"></div></div>
+              <span class="analyst-sig-val" id="aval-breath">—</span>
+              <span class="analyst-sig-detail" id="adet-breath"></span>
+            </div>
+            <div class="analyst-signal-row" id="sig-background">
+              <span class="analyst-sig-name">Background Noise</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-background"></div></div>
+              <span class="analyst-sig-val" id="aval-background">—</span>
+              <span class="analyst-sig-detail" id="adet-background"></span>
+            </div>
+            <div class="analyst-signal-row" id="sig-pronunciation">
+              <span class="analyst-sig-name">Pronunciation</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-pronunciation"></div></div>
+              <span class="analyst-sig-val" id="aval-pronunciation">—</span>
+              <span class="analyst-sig-detail" id="adet-pronunciation"></span>
+            </div>
+            <div class="analyst-signal-row" id="sig-emotional">
+              <span class="analyst-sig-name">Emotional Range</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-emotional"></div></div>
+              <span class="analyst-sig-val" id="aval-emotional">—</span>
+              <span class="analyst-sig-detail" id="adet-emotional"></span>
+            </div>
+            <div class="analyst-signal-row" id="sig-spectral">
+              <span class="analyst-sig-name">Spectral Texture</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-spectral"></div></div>
+              <span class="analyst-sig-val" id="aval-spectral">—</span>
+              <span class="analyst-sig-detail" id="adet-spectral"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Latency / Timing Signals -->
+        <div class="analyst-accordion" id="acc-latency">
+          <button class="analyst-acc-header" onclick="toggleAcc('latency')">
+            <span>⏱ Latency &amp; Timing Signals</span>
+            <span class="analyst-acc-arrow" id="arr-latency">▼</span>
+          </button>
+          <div class="analyst-acc-body" id="body-latency">
+            <div class="analyst-signal-row">
+              <span class="analyst-sig-name">Response Time</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-response_time"></div></div>
+              <span class="analyst-sig-val" id="aval-response_time">—</span>
+              <span class="analyst-sig-detail" id="adet-response_time"></span>
+            </div>
+            <div class="analyst-signal-row">
+              <span class="analyst-sig-name">Turn-Taking</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-turn_taking"></div></div>
+              <span class="analyst-sig-val" id="aval-turn_taking">—</span>
+              <span class="analyst-sig-detail" id="adet-turn_taking"></span>
+            </div>
+            <div class="analyst-signal-row">
+              <span class="analyst-sig-name">Self-Correction</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-self_correction"></div></div>
+              <span class="analyst-sig-val" id="aval-self_correction">—</span>
+              <span class="analyst-sig-detail" id="adet-self_correction"></span>
+            </div>
+            <div class="analyst-signal-row">
+              <span class="analyst-sig-name">Streaming Cadence</span>
+              <div class="analyst-bar-bg"><div class="analyst-bar-fill" id="abar-cadence"></div></div>
+              <span class="analyst-sig-val" id="aval-cadence">—</span>
+              <span class="analyst-sig-detail" id="adet-cadence"></span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end analyst-accordions -->
+
+      <!-- Key Evidence -->
+      <div class="analyst-evidence-box" id="analyst-evidence-box" style="display:none">
+        <div class="analyst-evidence-title">📋 Key Evidence</div>
+        <ul class="analyst-evidence-list" id="analyst-evidence-list"></ul>
+      </div>
+
+      <!-- Caveats -->
+      <div class="analyst-caveats-box" id="analyst-caveats-box" style="display:none">
+        <div class="analyst-caveats-title">⚠ Caveats</div>
+        <ul class="analyst-caveats-list" id="analyst-caveats-list"></ul>
+      </div>
+
+      <!-- Latency input area -->
+      <div class="analyst-inputs" id="analyst-inputs">
+        <div class="analyst-input-row">
+          <label for="analyst-resp-times">Response times (ms, comma-sep):</label>
+          <input class="form-input" id="analyst-resp-times" placeholder="e.g. 120,118,125,119" />
+        </div>
+        <div class="analyst-input-row">
+          <label for="analyst-wps">Words/sec per window (comma-sep):</label>
+          <input class="form-input" id="analyst-wps" placeholder="e.g. 4.2,4.1,4.3" />
+        </div>
+        <div class="analyst-input-row">
+          <label for="analyst-transcript">Transcript (optional):</label>
+          <input class="form-input" id="analyst-transcript" placeholder="Paste transcript for filler-word detection" />
+        </div>
+        <div class="analyst-input-row" style="gap:16px">
+          <label style="white-space:nowrap">Thinking pauses observed?</label>
+          <select class="form-input" id="analyst-thinking" style="max-width:160px">
+            <option value="unknown">Unknown</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <label style="white-space:nowrap">Interruptions detected?</label>
+          <select class="form-input" id="analyst-interruptions" style="max-width:160px">
+            <option value="unknown">Unknown</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <label style="white-space:nowrap">Self-corrections?</label>
+          <select class="form-input" id="analyst-selfcorrect" style="max-width:160px">
+            <option value="unknown">Unknown</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
+
+    </div><!-- end analyst-panel -->
 
     <!-- Full Width: Structured Decision Log -->
     <div class="panel col-full">
@@ -1180,6 +1603,641 @@ fileInput.onchange = async (e) => {
 
 /* ─── Initialization ─────────────────────────────────────────────────────── */
 initConnection();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AI VOICE ANALYST — Client-Side Quality + Latency Engine
+   All signals mirror src/quality_latency_analyst.py using Web Audio primitives
+═══════════════════════════════════════════════════════════════════════════ */
+
+let analystSamples = [];
+let analystSampleRate = 16000;
+
+// Accumulate samples from each audio chunk for the analyst
+const _origAnalyzeChunk = analyzeAudioChunk;
+function analyzeAudioChunk(samples, sr) {
+  analystSamples = analystSamples.concat(Array.from(samples));
+  if (analystSamples.length > sr * 30) analystSamples = analystSamples.slice(-sr * 30);
+  analystSampleRate = sr;
+  return _origAnalyzeChunk(samples, sr);
+}
+
+function toggleAcc(id) {
+  const body = document.getElementById('body-' + id);
+  const arr  = document.getElementById('arr-' + id);
+  const open = body.style.maxHeight && body.style.maxHeight !== '0px';
+  body.style.maxHeight = open ? '0px' : body.scrollHeight + 'px';
+  arr.textContent = open ? '▼' : '▲';
+}
+
+function analystScoreColor(s) {
+  if (s < 0.30) return 'var(--green)';
+  if (s < 0.55) return 'var(--amber)';
+  if (s < 0.75) return 'var(--orange)';
+  return 'var(--red)';
+}
+
+function updateAnalystBar(key, score, detail) {
+  const bar  = document.getElementById('abar-' + key);
+  const val  = document.getElementById('aval-' + key);
+  const det  = document.getElementById('adet-' + key);
+  if (!bar) return;
+  const pct = Math.max(0, Math.min(1, score));
+  bar.style.width      = (pct * 100).toFixed(1) + '%';
+  bar.style.background = analystScoreColor(pct);
+  bar.style.boxShadow  = `0 0 8px ${analystScoreColor(pct)}55`;
+  if (val) { val.textContent = pct.toFixed(3); val.style.color = analystScoreColor(pct); }
+  if (det && detail) det.textContent = detail;
+}
+
+// --- Scoring functions (JS ports of the Python analyst) -------------------
+
+function jsScoreProsody(samples, sr) {
+  const hopLen  = Math.round(sr * 0.010);
+  const frameLen = Math.round(sr * 0.030);
+  const rmsList = [];
+  for (let i = 0; i + frameLen <= samples.length; i += hopLen) {
+    let ss = 0;
+    for (let j = i; j < i + frameLen; j++) ss += samples[j] * samples[j];
+    rmsList.push(Math.sqrt(ss / frameLen));
+  }
+  if (!rmsList.length) return [0.3, 'too short'];
+  const mean = rmsList.reduce((a,b) => a+b, 0) / rmsList.length;
+  const std  = Math.sqrt(rmsList.reduce((a,b) => a + (b-mean)**2, 0) / rmsList.length);
+  const cv   = std / (mean + 1e-9);
+  let score, detail;
+  if (cv < 0.15)      { score = 1.0 - cv / 0.15;              detail = `energy CV=${cv.toFixed(3)} (unusually monotone)`; }
+  else if (cv < 0.30) { score = (0.30 - cv) / 0.15 * 0.5;    detail = `energy CV=${cv.toFixed(3)} (slightly monotone)`; }
+  else                { score = 0;                              detail = `energy CV=${cv.toFixed(3)} (natural range)`; }
+  return [score, detail];
+}
+
+function jsScoreBreath(samples, sr) {
+  const hopLen  = Math.round(sr * 0.010);
+  const frameLen = Math.round(sr * 0.025);
+  const silThresh = -45;
+  const minBreathMs = 50, maxBreathMs = 300;
+  const frames = [];
+  for (let i = 0; i + frameLen <= samples.length; i += hopLen) {
+    let ss = 0;
+    for (let j = i; j < i + frameLen; j++) ss += samples[j] * samples[j];
+    const rms = Math.sqrt(ss / frameLen);
+    frames.push(20 * Math.log10(rms + 1e-9));
+  }
+  if (!frames.length) return [0.3, 'too short'];
+  const isSilent = frames.map(f => f < silThresh);
+  const runs = [];
+  let cur = 0;
+  for (const s of isSilent) {
+    if (s) { cur++; }
+    else { if (cur) runs.push(cur); cur = 0; }
+  }
+  if (cur) runs.push(cur);
+  if (!runs.length) return [0.85, 'no silence gaps detected — gapless (TTS)');
+  const hopMs = hopLen / sr * 1000;
+  const runMs = runs.map(r => r * hopMs);
+  const breathLike = runMs.filter(ms => ms >= minBreathMs && ms <= maxBreathMs);
+  const ratio = breathLike.length / Math.max(1, runMs.length);
+  let score, detail;
+  if (ratio < 0.05) { score = 0.75; detail = `no breath-length pauses (ratio=${ratio.toFixed(2)})`; }
+  else if (ratio < 0.10) { score = 0.45; detail = `few breath pauses (ratio=${ratio.toFixed(2)})`; }
+  else { score = Math.max(0, 0.3 - ratio); detail = `natural breath pauses (ratio=${ratio.toFixed(2)})`; }
+  return [score, detail];
+}
+
+function jsScoreBackground(samples, sr) {
+  const nSegs = 10;
+  const segLen = Math.floor(samples.length / nSegs);
+  if (segLen < 160) return [0.3, 'too short'];
+  const floors = [];
+  for (let i = 0; i < nSegs; i++) {
+    const seg = samples.slice(i * segLen, (i + 1) * segLen);
+    const abs = seg.map(v => Math.abs(v)).sort((a,b) => a-b);
+    floors.push(abs[Math.floor(abs.length * 0.10)]);
+  }
+  const mean = floors.reduce((a,b) => a+b, 0) / floors.length;
+  const std  = Math.sqrt(floors.reduce((a,b) => a + (b-mean)**2, 0) / floors.length);
+  const cv   = std / (mean + 1e-9);
+  let score, detail;
+  if (mean < 1e-5 && cv < 0.1) { score = 0.90; detail = `near-silent BG (mean=${mean.toExponential(1)}) — studio-clean`; }
+  else if (cv < 0.05) { score = 0.65; detail = `background static (CV=${cv.toFixed(3)})`; }
+  else if (cv < 0.15) { score = 0.25; detail = `slightly stable BG (CV=${cv.toFixed(3)})`; }
+  else { score = 0;    detail = `naturally varying BG (CV=${cv.toFixed(3)})`; }
+  return [score, detail];
+}
+
+function jsScoreEmotional(samples, sr) {
+  // Proxy: variance of block-level RMS treated as emotional dynamics
+  const blockLen = Math.round(sr * 0.1);
+  const blocks = [];
+  for (let i = 0; i + blockLen <= samples.length; i += blockLen) {
+    let ss = 0;
+    for (let j = i; j < i + blockLen; j++) ss += samples[j] * samples[j];
+    blocks.push(Math.sqrt(ss / blockLen));
+  }
+  if (blocks.length < 4) return [0.3, 'too short'];
+  const mean = blocks.reduce((a,b) => a+b, 0) / blocks.length;
+  const std  = Math.sqrt(blocks.reduce((a,b) => a + (b-mean)**2, 0) / blocks.length);
+  const cv   = std / (mean + 1e-9);
+  let score, detail;
+  if (cv < 0.08)      { score = 1 - cv / 0.08;         detail = `dynamics CV=${cv.toFixed(3)} (emotionally flat)`; }
+  else if (cv < 0.18) { score = (0.18 - cv) / 0.10 * 0.5; detail = `dynamics CV=${cv.toFixed(3)} (limited range)`; }
+  else                { score = 0;                          detail = `dynamics CV=${cv.toFixed(3)} (natural variance)`; }
+  return [score, detail];
+}
+
+function jsScorePronunciation(samples, sr) {
+  // Approximate via zero-crossing rate variance (proxy for phoneme regularity)
+  const frameLen = Math.round(sr * 0.025);
+  const hopLen   = Math.round(sr * 0.010);
+  const zcrList  = [];
+  for (let i = 0; i + frameLen <= samples.length; i += hopLen) {
+    let zc = 0;
+    for (let j = i + 1; j < i + frameLen; j++) {
+      if ((samples[j] >= 0) !== (samples[j-1] >= 0)) zc++;
+    }
+    zcrList.push(zc / frameLen);
+  }
+  if (zcrList.length < 5) return [0.3, 'too short'];
+  const mean = zcrList.reduce((a,b) => a+b, 0) / zcrList.length;
+  const std  = Math.sqrt(zcrList.reduce((a,b) => a + (b-mean)**2, 0) / zcrList.length);
+  const cv   = std / (mean + 1e-9);
+  let score, detail;
+  if (cv < 0.20)      { score = 1 - cv / 0.20;              detail = `ZCR CV=${cv.toFixed(3)} (unnaturally uniform)`; }
+  else if (cv < 0.40) { score = (0.40 - cv) / 0.20 * 0.5;  detail = `ZCR CV=${cv.toFixed(3)} (slightly uniform)`; }
+  else                { score = 0;                            detail = `ZCR CV=${cv.toFixed(3)} (natural articulation)`; }
+  return [score, detail];
+}
+
+function jsScoreSpectral(samples, sr) {
+  // Approximate via lag-1 autocorrelation of RMS frames
+  const frameLen = Math.round(sr * 0.025);
+  const hopLen   = Math.round(sr * 0.010);
+  const rms = [];
+  for (let i = 0; i + frameLen <= samples.length; i += hopLen) {
+    let ss = 0;
+    for (let j = i; j < i + frameLen; j++) ss += samples[j] * samples[j];
+    rms.push(Math.sqrt(ss / frameLen));
+  }
+  if (rms.length < 4) return [0.3, 'too short'];
+  // Pearson r between rms[0..n-1] and rms[1..n]
+  const n = rms.length - 1;
+  const a = rms.slice(0, n), b = rms.slice(1);
+  const ma = a.reduce((x,y) => x+y, 0) / n, mb = b.reduce((x,y) => x+y, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (a[i]-ma)*(b[i]-mb); da += (a[i]-ma)**2; db += (b[i]-mb)**2; }
+  const r = num / (Math.sqrt(da) * Math.sqrt(db) + 1e-9);
+  let score, detail;
+  if (r > 0.92)      { score = (r - 0.92) / 0.08; detail = `autocorr=${r.toFixed(3)} (extremely smooth — vocoder)`; }
+  else if (r > 0.85) { score = (r - 0.85) / 0.07 * 0.6; detail = `autocorr=${r.toFixed(3)} (suspiciously smooth)`; }
+  else               { score = 0;                  detail = `autocorr=${r.toFixed(3)} (natural variation)`; }
+  return [score, detail];
+}
+
+function jsScoreResponseTime(timesMs) {
+  if (!timesMs.length) return [0.3, 'no response time data (neutral)'];
+  const mean = timesMs.reduce((a,b) => a+b, 0) / timesMs.length;
+  const std  = Math.sqrt(timesMs.reduce((a,b) => a + (b-mean)**2, 0) / timesMs.length);
+  const cv   = std / (mean + 1e-6);
+  let score, detail;
+  if (mean < 200 && cv < 0.10) { score = 0.90; detail = `mean=${mean.toFixed(0)}ms, CV=${cv.toFixed(3)} (fast+consistent — AI)`; }
+  else if (mean < 300 && cv < 0.20) { score = 0.65; detail = `mean=${mean.toFixed(0)}ms, CV=${cv.toFixed(3)} (fast+moderate)`; }
+  else if (cv < 0.15) { score = 0.50; detail = `mean=${mean.toFixed(0)}ms, CV=${cv.toFixed(3)} (consistent)`; }
+  else if (mean > 800) { score = 0.05; detail = `mean=${mean.toFixed(0)}ms (slow — human thinking time)`; }
+  else { score = 0.10; detail = `mean=${mean.toFixed(0)}ms, CV=${cv.toFixed(3)} (human range)`; }
+  return [score, detail];
+}
+
+function jsScoreTurnTaking(hasThinking, hasInterruptions) {
+  if (hasThinking === 'unknown' && hasInterruptions === 'unknown') return [0.35, 'no turn-taking data (neutral)'];
+  const parts = [];
+  const evid  = [];
+  if (hasThinking === 'no')  { parts.push(0.55); evid.push('no thinking pauses detected'); }
+  if (hasThinking === 'yes') { parts.push(0.0);  evid.push('natural thinking pauses present'); }
+  if (hasInterruptions === 'no')  { parts.push(0.40); evid.push('no interruptions detected'); }
+  if (hasInterruptions === 'yes') { parts.push(0.0);  evid.push('natural interruptions present'); }
+  const score = parts.length ? parts.reduce((a,b) => a+b) / parts.length : 0.35;
+  return [score, evid.join('; ') || 'neutral'];
+}
+
+function jsScoreSelfCorrection(hasSelf, transcript) {
+  const fillers = ['um','uh','er','hmm','like','you know','i mean','no wait','actually','sorry','hang on','let me','i meant'];
+  let fc = 0;
+  if (transcript) { const t = transcript.toLowerCase(); fillers.forEach(f => { let i = 0; while((i = t.indexOf(f, i)) !== -1) { fc++; i += f.length; }}); }
+  let score, detail;
+  if (hasSelf === 'no' && fc === 0)  { score = 0.80; detail = 'no self-corrections, no fillers — TTS characteristic'; }
+  else if (hasSelf === 'no')         { score = 0.50; detail = `no self-corrections; fillers=${fc}`; }
+  else if (hasSelf === 'yes')        { score = 0.05; detail = `self-corrections present; fillers=${fc}`; }
+  else if (fc === 0 && transcript)   { score = 0.55; detail = 'no disfluencies in transcript (suspiciously clean)'; }
+  else if (fc > 0)                   { score = Math.max(0, 0.2 - fc * 0.05); detail = `filler words present (count=${fc})`; }
+  else                               { score = 0.35; detail = 'insufficient data'; }
+  return [score, detail];
+}
+
+function jsScoreCadence(wpsValues) {
+  if (wpsValues.length < 3) return [0.30, 'insufficient cadence data (need ≥3 windows)'];
+  const mean = wpsValues.reduce((a,b) => a+b, 0) / wpsValues.length;
+  const std  = Math.sqrt(wpsValues.reduce((a,b) => a + (b-mean)**2, 0) / wpsValues.length);
+  const cv   = std / (mean + 1e-9);
+  let score, detail;
+  if (cv < 0.05)      { score = 0.90; detail = `WPS CV=${cv.toFixed(3)} (metronomic — TTS cadence)`; }
+  else if (cv < 0.12) { score = 0.70; detail = `WPS CV=${cv.toFixed(3)} (suspiciously consistent)`; }
+  else if (cv < 0.20) { score = 0.35; detail = `WPS CV=${cv.toFixed(3)} (slightly regular)`; }
+  else                { score = 0;    detail = `WPS CV=${cv.toFixed(3)} (natural speech rate)`; }
+  return [score, detail];
+}
+
+// --- Build verdict from overall score -------------------------------------
+function jsVerdict(overall) {
+  const AI_THRESH    = 0.62;
+  const HUMAN_THRESH = 0.35;
+  const HIGH_MARGIN  = 0.18;
+  const MED_MARGIN   = 0.08;
+  let verdict, dist;
+  if (overall >= AI_THRESH)    { verdict = 'Likely AI-generated'; dist = overall - AI_THRESH; }
+  else if (overall <= HUMAN_THRESH) { verdict = 'Likely human';   dist = HUMAN_THRESH - overall; }
+  else                         { verdict = 'Uncertain';           dist = Math.min(overall - HUMAN_THRESH, AI_THRESH - overall); }
+  const confidence = dist >= HIGH_MARGIN ? 'High' : dist >= MED_MARGIN ? 'Medium' : 'Low';
+  return { verdict, confidence };
+}
+
+// --- Main analyst runner --------------------------------------------------
+function runAnalyst() {
+  if (analystSamples.length < 1600) {
+    alert('Please record or upload some audio first (needs at least 0.1 s of audio).');
+    return;
+  }
+
+  const samples = new Float32Array(analystSamples);
+  const sr      = analystSampleRate;
+
+  // ── Quality signals ──────────────────────────────────────────────
+  const [prosodyScore,  prosodyDetail]  = jsScoreProsody(samples, sr);
+  const [breathScore,   breathDetail]   = jsScoreBreath(samples, sr);
+  const [bgScore,       bgDetail]       = jsScoreBackground(samples, sr);
+  const [pronScore,     pronDetail]     = jsScorePronunciation(samples, sr);
+  const [emotScore,     emotDetail]     = jsScoreEmotional(samples, sr);
+  const [specScore,     specDetail]     = jsScoreSpectral(samples, sr);
+
+  // Aggregate quality (matching Python weights)
+  const qualAgg = 0.20 * prosodyScore + 0.18 * breathScore + 0.12 * bgScore
+                + 0.20 * pronScore    + 0.15 * emotScore   + 0.15 * specScore;
+
+  // ── Latency / Timing signals ─────────────────────────────────────
+  const respTimesRaw = document.getElementById('analyst-resp-times').value;
+  const wpsRaw       = document.getElementById('analyst-wps').value;
+  const transcript   = document.getElementById('analyst-transcript').value;
+  const hasThinking  = document.getElementById('analyst-thinking').value;
+  const hasInterrupt = document.getElementById('analyst-interruptions').value;
+  const hasSelf      = document.getElementById('analyst-selfcorrect').value;
+
+  const respTimes = respTimesRaw ? respTimesRaw.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x)) : [];
+  const wpsVals   = wpsRaw ? wpsRaw.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x)) : [];
+
+  const [rtScore,  rtDetail]  = jsScoreResponseTime(respTimes);
+  const [ttScore,  ttDetail]  = jsScoreTurnTaking(hasThinking, hasInterrupt);
+  const [scScore,  scDetail]  = jsScoreSelfCorrection(hasSelf, transcript);
+  const [cadScore, cadDetail] = jsScoreCadence(wpsVals);
+
+  const latAgg = 0.35 * rtScore + 0.25 * ttScore + 0.25 * scScore + 0.15 * cadScore;
+
+  const hasLatencyData = (respTimes.length > 0 || wpsVals.length >= 3
+    || hasThinking !== 'unknown' || hasInterrupt !== 'unknown' || hasSelf !== 'unknown');
+
+  const overall = hasLatencyData
+    ? 0.70 * qualAgg + 0.30 * latAgg
+    : qualAgg;
+
+  renderAnalystReport({
+    prosody:       [prosodyScore, prosodyDetail],
+    breath:        [breathScore,  breathDetail],
+    background:    [bgScore,      bgDetail],
+    pronunciation: [pronScore,    pronDetail],
+    emotional:     [emotScore,    emotDetail],
+    spectral:      [specScore,    specDetail],
+    response_time: [rtScore,      rtDetail],
+    turn_taking:   [ttScore,      ttDetail],
+    self_correction:[scScore,     scDetail],
+    cadence:       [cadScore,     cadDetail],
+    qualAgg, latAgg, overall,
+    hasLatencyData,
+    transcript, hasSelf,
+  });
+}
+
+function renderAnalystReport(r) {
+  const { verdict, confidence } = jsVerdict(r.overall);
+
+  // ── Verdict Card ──────────────────────────────────────────────
+  const card    = document.getElementById('analyst-verdict-card');
+  const badge   = document.getElementById('analyst-verdict-badge');
+  const chip    = document.getElementById('analyst-confidence-chip');
+  const qval    = document.getElementById('analyst-quality-val');
+  const lval    = document.getElementById('analyst-latency-val');
+  const oval    = document.getElementById('analyst-overall-val');
+
+  card.className = `analyst-verdict-card analyst-verdict-${verdict === 'Likely AI-generated' ? 'ai' : verdict === 'Likely human' ? 'human' : 'uncertain'}`;
+  badge.textContent = verdict;
+  chip.textContent  = `Confidence: ${confidence}`;
+  chip.className    = `analyst-confidence-chip conf-${confidence.toLowerCase()}`;
+  qval.textContent  = r.qualAgg.toFixed(3); qval.style.color = analystScoreColor(r.qualAgg);
+  lval.textContent  = r.latAgg.toFixed(3);  lval.style.color = analystScoreColor(r.latAgg);
+  oval.textContent  = r.overall.toFixed(3); oval.style.color = analystScoreColor(r.overall);
+
+  // ── Signal bars ───────────────────────────────────────────────
+  updateAnalystBar('prosody',       r.prosody[0],       r.prosody[1]);
+  updateAnalystBar('breath',        r.breath[0],        r.breath[1]);
+  updateAnalystBar('background',    r.background[0],    r.background[1]);
+  updateAnalystBar('pronunciation', r.pronunciation[0], r.pronunciation[1]);
+  updateAnalystBar('emotional',     r.emotional[0],     r.emotional[1]);
+  updateAnalystBar('spectral',      r.spectral[0],      r.spectral[1]);
+  updateAnalystBar('response_time', r.response_time[0], r.response_time[1]);
+  updateAnalystBar('turn_taking',   r.turn_taking[0],   r.turn_taking[1]);
+  updateAnalystBar('self_correction', r.self_correction[0], r.self_correction[1]);
+  updateAnalystBar('cadence',       r.cadence[0],       r.cadence[1]);
+
+  // Open accordions
+  const bodyQ = document.getElementById('body-quality');
+  const bodyL = document.getElementById('body-latency');
+  bodyQ.style.maxHeight = bodyQ.scrollHeight + 'px';
+  bodyL.style.maxHeight = bodyL.scrollHeight + 'px';
+  document.getElementById('arr-quality').textContent = '▲';
+  document.getElementById('arr-latency').textContent = '▲';
+
+  // ── Key Evidence ──────────────────────────────────────────────
+  const allSigs = [
+    ['Prosody',        r.prosody],
+    ['Breath/Disfluency', r.breath],
+    ['Background',     r.background],
+    ['Pronunciation',  r.pronunciation],
+    ['Emotional Range',r.emotional],
+    ['Spectral Texture',r.spectral],
+    ['Response Time',  r.response_time],
+    ['Turn-Taking',    r.turn_taking],
+    ['Self-Correction',r.self_correction],
+    ['Streaming Cadence',r.cadence],
+  ].sort((a, b) => b[1][0] - a[1][0]);
+
+  const evBox  = document.getElementById('analyst-evidence-box');
+  const evList = document.getElementById('analyst-evidence-list');
+  evList.innerHTML = '';
+  evBox.style.display = 'block';
+  allSigs.slice(0, 4).forEach(([name, [score, detail]]) => {
+    const li = document.createElement('li');
+    const pct = Math.round(score * 100);
+    const dir = score >= 0.50 ? 'elevated suspicion' : score >= 0.25 ? 'mild suspicion' : 'consistent with human';
+    li.innerHTML = `<strong>[${name}]</strong> score=${pct}% — ${detail} <em>(${dir})</em>`;
+    li.style.color = analystScoreColor(score);
+    evList.appendChild(li);
+  });
+
+  // ── Caveats ───────────────────────────────────────────────────
+  const caveats = [];
+  if (verdict === 'Likely AI-generated' && r.prosody[0] >= 0.4 && r.breath[0] < 0.3)
+    caveats.push('A human reading from a teleprompter may show similar prosody smoothness without breath deficits.');
+  if (!r.hasLatencyData)
+    caveats.push('No latency data provided — timing signals defaulted to neutral. Supply response times and WPS for higher accuracy.');
+  if (r.background[0] >= 0.70)
+    caveats.push('Heavy VoIP/codec compression removes background noise and can make real speech appear studio-clean.');
+  if ((verdict === 'Likely AI-generated' || verdict === 'Uncertain') && r.self_correction[0] >= 0.5)
+    caveats.push('Some AI voice agents deliberately inject filler words to mimic human disfluency.');
+
+  const cvBox  = document.getElementById('analyst-caveats-box');
+  const cvList = document.getElementById('analyst-caveats-list');
+  cvList.innerHTML = '';
+  if (caveats.length) {
+    cvBox.style.display = 'block';
+    caveats.forEach(c => {
+      const li = document.createElement('li'); li.textContent = c; cvList.appendChild(li);
+    });
+  } else {
+    cvBox.style.display = 'none';
+  }
+}
+
+document.getElementById('btn-run-analyst').onclick = runAnalyst;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAB NAVIGATION
+═══════════════════════════════════════════════════════════════════════════ */
+function switchTab(name) {
+  ['live','batch','bench','about'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    const btn = document.getElementById('tab-' + t + '-btn');
+    if (btn) { btn.classList.toggle('active', t === name); btn.setAttribute('aria-selected', t === name); }
+  });
+  if (name === 'bench') initBenchmarkChart();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BATCH ANALYZER
+═══════════════════════════════════════════════════════════════════════════ */
+let batchFiles  = [];
+let batchResults = [];
+
+const dropzone = document.getElementById('batch-dropzone');
+const batchInput = document.getElementById('batch-file-input');
+
+if (dropzone) {
+  dropzone.addEventListener('click', () => batchInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    handleBatchFiles(Array.from(e.dataTransfer.files));
+  });
+  batchInput.addEventListener('change', () => handleBatchFiles(Array.from(batchInput.files)));
+  document.getElementById('btn-batch-analyze').onclick = runBatchAnalysis;
+  document.getElementById('btn-batch-export').onclick  = exportBatchCSV;
+  document.getElementById('btn-batch-clear').onclick   = clearBatch;
+}
+
+function handleBatchFiles(files) {
+  const allowed = ['audio/wav','audio/flac','audio/mpeg','audio/ogg','audio/x-m4a','audio/webm','audio/mp4'];
+  const newFiles = files.filter(f => allowed.includes(f.type) || f.name.match(/\.(wav|flac|mp3|ogg|m4a|webm)$/i));
+  batchFiles = [...batchFiles, ...newFiles];
+  renderBatchTable();
+  const dropTxt = document.getElementById('batch-dropzone-text');
+  if (dropTxt) dropTxt.textContent = `${batchFiles.length} file(s) queued — click Analyze All`;
+}
+
+function renderBatchTable() {
+  const tbody = document.getElementById('batch-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  batchFiles.forEach((file, i) => {
+    const res  = batchResults[i];
+    const tr   = document.createElement('tr');
+    const verd = res ? getVerdict(res.overall) : 'Pending';
+    const vcls = res ? (verd === 'Likely AI-generated' ? 'ai' : verd === 'Likely human' ? 'human' : 'uncertain') : 'pending';
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td style="font-weight:600">${file.name}</td>
+      <td>${(file.size / 1024).toFixed(0)} KB</td>
+      <td>${res ? res.quality.toFixed(3) : '—'}</td>
+      <td>${res ? res.latency.toFixed(3) : '—'}</td>
+      <td>${res ? res.overall.toFixed(3) : '—'}</td>
+      <td><span class="verdict-pill verdict-${vcls}">${verd}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('batch-summary').textContent =
+    batchResults.length ? `${batchResults.length} / ${batchFiles.length} analyzed` : '';
+}
+
+function getVerdict(score) {
+  if (score >= 0.62) return 'Likely AI-generated';
+  if (score <= 0.35) return 'Likely human';
+  return 'Uncertain';
+}
+
+async function runBatchAnalysis() {
+  if (!batchFiles.length) { alert('Drop some audio files first.'); return; }
+  batchResults = new Array(batchFiles.length).fill(null);
+  renderBatchTable();
+
+  for (let i = 0; i < batchFiles.length; i++) {
+    const file = batchFiles[i];
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtxTmp = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const audioBuffer  = await audioCtxTmp.decodeAudioData(arrayBuffer);
+      const samples      = audioBuffer.getChannelData(0);
+
+      // Reuse all analyst quality scorers from the analyst JS section
+      analystSamples    = Array.from(samples);
+      analystSampleRate = audioBuffer.sampleRate;
+
+      // Run analysis
+      const [pScore] = jsScoreProsody(new Float32Array(samples), audioBuffer.sampleRate);
+      const [bScore] = jsScoreBreath(new Float32Array(samples), audioBuffer.sampleRate);
+      const [bgScore] = jsScoreBackground(new Float32Array(samples), audioBuffer.sampleRate);
+      const [prScore] = jsScorePronunciation(new Float32Array(samples), audioBuffer.sampleRate);
+      const [eScore]  = jsScoreEmotional(new Float32Array(samples), audioBuffer.sampleRate);
+      const [spScore] = jsScoreSpectral(new Float32Array(samples), audioBuffer.sampleRate);
+
+      const quality = 0.20*pScore + 0.18*bScore + 0.12*bgScore + 0.20*prScore + 0.15*eScore + 0.15*spScore;
+      const overall = quality; // no latency data in batch
+
+      batchResults[i] = { quality, latency: 0.35, overall };
+      await audioCtxTmp.close();
+    } catch(e) {
+      batchResults[i] = { quality: 0, latency: 0, overall: 0, error: e.message };
+    }
+    renderBatchTable();
+  }
+}
+
+function exportBatchCSV() {
+  if (!batchResults.length) return;
+  const rows = [['#','Filename','Quality Score','Overall Score','Verdict']];
+  batchFiles.forEach((f, i) => {
+    const r = batchResults[i];
+    if (r) rows.push([i+1, f.name, r.quality.toFixed(4), r.overall.toFixed(4), getVerdict(r.overall)]);
+  });
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'voiceguard_batch_results.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearBatch() {
+  batchFiles = []; batchResults = [];
+  const tbody = document.getElementById('batch-tbody');
+  if (tbody) tbody.innerHTML = '';
+  const dropTxt = document.getElementById('batch-dropzone-text');
+  if (dropTxt) dropTxt.textContent = 'Drop audio files here or click to browse';
+  document.getElementById('batch-summary').textContent = '';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BENCHMARK EXPLORER
+═══════════════════════════════════════════════════════════════════════════ */
+const BENCH_DATA = {
+  published: [
+    { name: 'AASIST',    eer: 0.83, color: '#2edd9b' },
+    { name: 'RawNet2',   eer: 1.12, color: '#4f8ef7' },
+    { name: 'LFCC-LCNN', eer: 2.19, color: '#f5c542' },
+    { name: 'SincNet',   eer: 3.54, color: '#f57f42' },
+    { name: 'VoiceGuard CM', eer: null, color: '#f74f6a' },
+  ]
+};
+
+let _chartInitialized = false;
+
+function initBenchmarkChart() {
+  if (_chartInitialized) return;
+  const canvas = document.getElementById('bench-chart');
+  if (!canvas) return;
+
+  // Try to load Chart.js dynamically
+  if (!window.Chart) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload = () => renderChart(canvas);
+    document.head.appendChild(s);
+  } else {
+    renderChart(canvas);
+  }
+
+  // Also try to load real benchmark from API
+  fetch('/api/v1/benchmark')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      const voiceguardResult = data.results?.voiceguard_cm;
+      if (voiceguardResult?.eer !== null && voiceguardResult?.eer !== undefined) {
+        BENCH_DATA.published.find(d => d.name === 'VoiceGuard CM').eer = voiceguardResult.eer;
+        document.getElementById('bench-voiceguard-eer').textContent = voiceguardResult.eer.toFixed(2) + '%';
+        document.getElementById('bench-voiceguard-tdcf').textContent = (voiceguardResult.min_tDCF || 0).toFixed(4);
+        if (_chartInitialized) renderChart(canvas);
+      }
+    })
+    .catch(() => {});
+
+  _chartInitialized = true;
+}
+
+function renderChart(canvas) {
+  const labels = BENCH_DATA.published.map(d => d.name);
+  const values = BENCH_DATA.published.map(d => d.eer ?? 0);
+  const colors = BENCH_DATA.published.map(d => d.color);
+
+  if (window._benchChart) window._benchChart.destroy();
+  window._benchChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'EER (%) — lower is better',
+        data: values,
+        backgroundColor: colors.map(c => c + '44'),
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e8edf8', font: { family: 'Inter', size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ` EER: ${ctx.parsed.y === 0 ? 'Pending' : ctx.parsed.y.toFixed(2) + '%'}` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(78,143,247,0.08)' }, ticks: { color: '#7a8aab', font: { size: 11 } } },
+        y: {
+          grid: { color: 'rgba(78,143,247,0.08)' }, ticks: { color: '#7a8aab', font: { size: 11 },
+            callback: v => v + '%'
+          },
+          title: { display: true, text: 'Equal Error Rate (%)', color: '#7a8aab', font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
 </script>
 </body>
 </html>
