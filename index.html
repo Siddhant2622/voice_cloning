@@ -1145,12 +1145,12 @@ function setEdgeMode() {
 function handleScore(data) {
   if (data.type !== 'score') return;
 
-  const fusion  = data.fusion_score ?? 0.05;
-  const cm      = data.cm_score ?? null;
-  const lv      = data.liveness_score ?? null;
-  const sv      = data.sv_score ?? null;
-  const dec     = data.decision ?? 'ALLOW';
-  const latency = data.latency_ms ?? null;
+  const fusion  = Number.isFinite(data.fusion_score) ? data.fusion_score : 0.05;
+  const cm      = Number.isFinite(data.cm_score) ? data.cm_score : null;
+  const lv      = Number.isFinite(data.liveness_score) ? data.liveness_score : null;
+  const sv      = Number.isFinite(data.sv_score) ? data.sv_score : null;
+  const dec     = data.decision || 'ALLOW';
+  const latency = Number.isFinite(data.latency_ms) ? data.latency_ms : null;
 
   windowCount++;
   document.getElementById('met-windows').textContent = windowCount;
@@ -1242,21 +1242,9 @@ function analyzeAudioChunk(samples, sampleRate) {
   }
   const rms = Math.sqrt(sumSq / len);
 
-  // Silence Gating
+  // Silence Gating: return explicit silence flag and metrics
   if (rms < 0.005 && maxAmp < 0.02) {
-    sessionEma = 0.05 * 0.4 + sessionEma * 0.6;
-    return {
-      type: "score",
-      timestamp: new Date().toISOString(),
-      window_index: windowCount + 1,
-      cm_score: 0.04,
-      liveness_score: 0.05,
-      sv_score: null,
-      fusion_score: Number(sessionEma.toFixed(3)),
-      decision: "ALLOW",
-      reason: "Silence / ambient room acoustics (no active speech)",
-      latency_ms: Math.round(performance.now() - t0)
-    };
+    return { rms, zcr: 0, hfRatio: 0, isSilence: true, latency: Math.round(performance.now() - t0) };
   }
 
   // 2. Zero-Crossing Rate
@@ -1372,10 +1360,13 @@ async function startMic() {
 }
 
 function evaluateEdgeRisk(analysis, forcedProfile = null) {
-  let cm = 0.08;
-  let lv = 0.06;
+  let cm = 0.05;
+  let lv = 0.05;
 
-  if (forcedProfile === 'human') {
+  if (analysis && analysis.isSilence) {
+    cm = 0.04;
+    lv = 0.05;
+  } else if (forcedProfile === 'human') {
     cm = 0.05 + Math.random() * 0.08;
     lv = 0.04 + Math.random() * 0.06;
   } else if (forcedProfile === 'synth') {
@@ -1384,23 +1375,35 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
   } else if (forcedProfile === 'neural') {
     cm = 0.62 + Math.random() * 0.12;
     lv = 0.54 + Math.random() * 0.10;
-  } else {
+  } else if (analysis) {
     // Acoustic live evaluation
-    if (analysis.hfRatio > 0.35 || analysis.zcr > 0.32) {
-      cm = 0.72 + (analysis.hfRatio * 0.2);
+    const hf = Number(analysis.hfRatio) || 0;
+    const zcr = Number(analysis.zcr) || 0;
+    const rms = Number(analysis.rms) || 0;
+
+    if (hf > 0.35 || zcr > 0.32) {
+      cm = 0.72 + (hf * 0.2);
       lv = 0.65;
     } else {
-      cm = Math.min(0.25, 0.04 + (analysis.rms * 0.3));
+      cm = Math.min(0.25, 0.04 + (rms * 0.3));
       lv = 0.06 + Math.random() * 0.05;
     }
   }
 
+  // Strictly enforce numeric finite bounds
+  cm = Number.isFinite(cm) ? Math.max(0, Math.min(1, cm)) : 0.05;
+  lv = Number.isFinite(lv) ? Math.max(0, Math.min(1, lv)) : 0.05;
+
   const instant = 0.70 * cm + 0.30 * lv;
+  if (!Number.isFinite(sessionEma)) sessionEma = 0.05;
   sessionEma = 0.60 * instant + 0.40 * sessionEma;
+  if (!Number.isFinite(sessionEma)) sessionEma = instant;
   const fusion = sessionEma;
 
   let decision = "ALLOW";
-  let reason = "Human vocal tract dynamics confirmed.";
+  let reason = (analysis && analysis.isSilence)
+    ? "Ambient room acoustics (silence / no active speech)."
+    : "Human vocal tract dynamics confirmed.";
 
   if (fusion >= 0.88) {
     decision = "BLOCK";
@@ -1423,7 +1426,7 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
     fusion_score: Number(fusion.toFixed(3)),
     decision: decision,
     reason: reason,
-    latency_ms: Math.round(analysis.latency || 14)
+    latency_ms: Math.round((analysis && analysis.latency) || 12)
   });
 }
 
