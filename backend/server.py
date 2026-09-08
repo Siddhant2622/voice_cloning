@@ -45,8 +45,8 @@ from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from api.auth import require_api_key
-from api.config import Settings, get_settings
+from backend.auth import require_api_key
+from backend.config import Settings, get_settings
 
 logger = logging.getLogger("voiceguard.api")
 logging.basicConfig(
@@ -493,7 +493,7 @@ if __name__ == "__main__":
     import uvicorn
     s = get_settings()
     uvicorn.run(
-        "api.server:app",
+        "backend.server:app",
         host=s.host,
         port=s.port,
         reload=s.debug,

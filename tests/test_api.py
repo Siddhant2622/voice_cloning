@@ -11,7 +11,7 @@ import torch
 import soundfile as sf
 from fastapi.testclient import TestClient
 
-from api.server import app, _load_models, _score_waveform, get_settings
+from backend.server import app, _load_models, _score_waveform, get_settings
 
 
 @pytest.fixture(scope="module", autouse=True)

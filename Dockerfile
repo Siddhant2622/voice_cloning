@@ -40,7 +40,7 @@ WORKDIR /app
 
 # Copy application code
 COPY --chown=voiceguard:voiceguard src/           ./src/
-COPY --chown=voiceguard:voiceguard api/           ./api/
+COPY --chown=voiceguard:voiceguard backend/       ./backend/
 COPY --chown=voiceguard:voiceguard training/      ./training/
 COPY --chown=voiceguard:voiceguard data/          ./data/
 COPY --chown=voiceguard:voiceguard config/        ./config/
@@ -63,6 +63,6 @@ EXPOSE 8000
 # Production: run the FastAPI server
 # Mount model checkpoint: -v /path/to/models:/app/models
 # Set env vars via: --env-file .env
-CMD ["python", "-m", "uvicorn", "api.server:app", \
+CMD ["python", "-m", "uvicorn", "backend.server:app", \
      "--host", "0.0.0.0", "--port", "8000", \
      "--workers", "1", "--log-level", "info"]

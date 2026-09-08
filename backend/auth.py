@@ -8,7 +8,7 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.config import get_settings
+from backend.config import get_settings
 
 _bearer = HTTPBearer(auto_error=False)
 
