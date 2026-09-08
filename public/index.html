@@ -1598,6 +1598,7 @@ btnReset.onclick     = () => {
   windowCount = 0;
   latencies   = [];
   sessionEma  = 0.05;
+  analystSampleCount = 0;
   logBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>';
   document.getElementById('met-windows').textContent = '0';
   document.getElementById('met-p50').textContent = '—';
@@ -1632,15 +1633,28 @@ initConnection();
    All signals mirror src/quality_latency_analyst.py using Web Audio primitives
 ═══════════════════════════════════════════════════════════════════════════ */
 
-let analystSamples = [];
+const MAX_ANALYST_SAMPLES = 16000 * 15; // 15 seconds ring buffer
+let analystBuffer = new Float32Array(MAX_ANALYST_SAMPLES);
+let analystSampleCount = 0;
 let analystSampleRate = 16000;
 
-// Accumulate samples from each audio chunk for the analyst
+// Accumulate samples without heap allocations or GC thrashing
 const _origAnalyzeChunk = analyzeAudioChunk;
 function analyzeAudioChunk(samples, sr) {
-  analystSamples = analystSamples.concat(Array.from(samples));
-  if (analystSamples.length > sr * 30) analystSamples = analystSamples.slice(-sr * 30);
   analystSampleRate = sr;
+  const len = samples.length;
+  if (len >= MAX_ANALYST_SAMPLES) {
+    analystBuffer.set(samples.subarray(len - MAX_ANALYST_SAMPLES));
+    analystSampleCount = MAX_ANALYST_SAMPLES;
+  } else if (analystSampleCount + len <= MAX_ANALYST_SAMPLES) {
+    analystBuffer.set(samples, analystSampleCount);
+    analystSampleCount += len;
+  } else {
+    const overflow = (analystSampleCount + len) - MAX_ANALYST_SAMPLES;
+    analystBuffer.copyWithin(0, overflow, analystSampleCount);
+    analystBuffer.set(samples, MAX_ANALYST_SAMPLES - len);
+    analystSampleCount = MAX_ANALYST_SAMPLES;
+  }
   return _origAnalyzeChunk(samples, sr);
 }
 
@@ -1886,12 +1900,12 @@ function jsVerdict(overall) {
 
 // --- Main analyst runner --------------------------------------------------
 function runAnalyst() {
-  if (analystSamples.length < 1600) {
+  if (analystSampleCount < 1600) {
     alert('Please record or upload some audio first (needs at least 0.1 s of audio).');
     return;
   }
 
-  const samples = new Float32Array(analystSamples);
+  const samples = analystBuffer.subarray(0, analystSampleCount);
   const sr      = analystSampleRate;
 
   // ── Quality signals ──────────────────────────────────────────────
