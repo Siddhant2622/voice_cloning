@@ -1,0 +1,29 @@
+# .vercelignore
+# Exclude heavy Python ML backend files and requirements from Vercel Serverless deployment
+requirements.txt
+requirements-dev.txt
+.venv/
+__pycache__/
+*.pyc
+
+# Python source and backend server (runs in Docker / GPU server)
+api/*.py
+src/
+data/
+training/
+tests/
+notebooks/
+results/
+models/
+*.pt
+*.pkl
+*.joblib
+*.bin
+*.safetensors
+
+# Container and CI configs
+Dockerfile
+docker-compose.yml
+.github/
+.git/
+.env*
