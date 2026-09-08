@@ -1491,6 +1491,7 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
     const chunk = rawData.slice(offset, offset + CHUNK);
     offset += CHUNK;
 
+    const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
     appendAnalystAudio(resampled, 16000);
 
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
