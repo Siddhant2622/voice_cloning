@@ -61,3 +61,9 @@ logs/*.jsonl
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
