@@ -6,6 +6,7 @@
   <title>VoiceGuard — Real-Time Voice Clone Detection</title>
   <meta name="description"
         content="AI-powered real-time voice clone and synthetic speech detection system. Detects deepfake audio attacks on live calls." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -1044,6 +1045,14 @@ function getWsUrl() {
 
 function initConnection() {
   if (forcedEngine === 'edge') {
+    setEdgeMode();
+    return;
+  }
+
+  // Vercel serverless functions do not support stateful WebSockets.
+  // Activate in-browser Edge Engine directly unless user configured a custom backend URL in Settings.
+  const isVercelHost = location.hostname.endsWith('.vercel.app') || location.hostname.includes('vercel.app');
+  if (isVercelHost && !customWsUrl && forcedEngine !== 'ws') {
     setEdgeMode();
     return;
   }
