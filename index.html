@@ -989,6 +989,30 @@ const CHUNK_MS    = 100;
 let customWsUrl   = localStorage.getItem('voiceguard_ws_url') || '';
 let forcedEngine  = localStorage.getItem('voiceguard_engine_mode') || 'auto';
 
+/* ─── Global AI Voice Analyst Audio Buffer (Fixed 15s Ring Buffer) ──────── */
+const MAX_ANALYST_SAMPLES = 16000 * 15;
+let analystBuffer = new Float32Array(MAX_ANALYST_SAMPLES);
+let analystSampleCount = 0;
+let analystSampleRate = 16000;
+
+function appendAnalystAudio(samples, sr = 16000) {
+  if (!samples || !samples.length) return;
+  analystSampleRate = sr;
+  const len = samples.length;
+  if (len >= MAX_ANALYST_SAMPLES) {
+    analystBuffer.set(samples.subarray(len - MAX_ANALYST_SAMPLES));
+    analystSampleCount = MAX_ANALYST_SAMPLES;
+  } else if (analystSampleCount + len <= MAX_ANALYST_SAMPLES) {
+    analystBuffer.set(samples, analystSampleCount);
+    analystSampleCount += len;
+  } else {
+    const overflow = (analystSampleCount + len) - MAX_ANALYST_SAMPLES;
+    analystBuffer.copyWithin(0, overflow, analystSampleCount);
+    analystBuffer.set(samples, MAX_ANALYST_SAMPLES - len);
+    analystSampleCount = MAX_ANALYST_SAMPLES;
+  }
+}
+
 /* ─── DOM References ────────────────────────────────────────────────────── */
 const connDot        = document.getElementById('conn-dot');
 const connLabel      = document.getElementById('conn-label');
@@ -1321,9 +1345,7 @@ async function startMic() {
     const resampled = downsampleBuffer(inputData, audioCtx.sampleRate, 16000);
 
     // Keep rolling buffer for AI Voice Analyst tab
-    for (let i = 0; i < resampled.length; i++) analystSamples.push(resampled[i]);
-    if (analystSamples.length > 16000 * 30) analystSamples = analystSamples.slice(-16000 * 30);
-    analystSampleRate = 16000;
+    appendAnalystAudio(resampled, 16000);
 
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
       const int16 = floatTo16Bit(resampled);
@@ -1466,10 +1488,7 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
     const chunk = rawData.slice(offset, offset + CHUNK);
     offset += CHUNK;
 
-    const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
-    for (let i = 0; i < resampled.length; i++) analystSamples.push(resampled[i]);
-    if (analystSamples.length > 16000 * 30) analystSamples = analystSamples.slice(-16000 * 30);
-    analystSampleRate = 16000;
+    appendAnalystAudio(resampled, 16000);
 
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
       const int16 = floatTo16Bit(resampled);
@@ -1632,31 +1651,6 @@ initConnection();
    AI VOICE ANALYST — Client-Side Quality + Latency Engine
    All signals mirror src/quality_latency_analyst.py using Web Audio primitives
 ═══════════════════════════════════════════════════════════════════════════ */
-
-const MAX_ANALYST_SAMPLES = 16000 * 15; // 15 seconds ring buffer
-let analystBuffer = new Float32Array(MAX_ANALYST_SAMPLES);
-let analystSampleCount = 0;
-let analystSampleRate = 16000;
-
-// Accumulate samples without heap allocations or GC thrashing
-const _origAnalyzeChunk = analyzeAudioChunk;
-function analyzeAudioChunk(samples, sr) {
-  analystSampleRate = sr;
-  const len = samples.length;
-  if (len >= MAX_ANALYST_SAMPLES) {
-    analystBuffer.set(samples.subarray(len - MAX_ANALYST_SAMPLES));
-    analystSampleCount = MAX_ANALYST_SAMPLES;
-  } else if (analystSampleCount + len <= MAX_ANALYST_SAMPLES) {
-    analystBuffer.set(samples, analystSampleCount);
-    analystSampleCount += len;
-  } else {
-    const overflow = (analystSampleCount + len) - MAX_ANALYST_SAMPLES;
-    analystBuffer.copyWithin(0, overflow, analystSampleCount);
-    analystBuffer.set(samples, MAX_ANALYST_SAMPLES - len);
-    analystSampleCount = MAX_ANALYST_SAMPLES;
-  }
-  return _origAnalyzeChunk(samples, sr);
-}
 
 function toggleAcc(id) {
   const body = document.getElementById('body-' + id);
@@ -2143,8 +2137,7 @@ async function runBatchAnalysis() {
       const samples      = audioBuffer.getChannelData(0);
 
       // Reuse all analyst quality scorers from the analyst JS section
-      analystSamples    = Array.from(samples);
-      analystSampleRate = audioBuffer.sampleRate;
+      appendAnalystAudio(samples, audioBuffer.sampleRate);
 
       // Run analysis
       const [pScore] = jsScoreProsody(new Float32Array(samples), audioBuffer.sampleRate);
