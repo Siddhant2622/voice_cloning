@@ -90,6 +90,9 @@ def extract_logmel(
         Log-mel tensor [n_mels, T_frames] (float32, on CPU).
     """
     torch = _torch()
+    import numpy as np
+    if not isinstance(waveform, torch.Tensor):
+        waveform = torch.from_numpy(np.asarray(waveform, dtype=np.float32))
     mel_transform = _get_mel_transform()
     # Always use CPU for STFT to avoid window/tensor device mismatch
     waveform_cpu = waveform.cpu()
@@ -166,9 +169,17 @@ def extract_ssl_embedding(
         logger.debug("Clipping waveform to %d s for SSL embedding.", SSL_MAX_SECONDS)
         waveform = waveform[:max_samples]
 
+    import numpy as np
+    if hasattr(waveform, "detach"):
+        wav_np = waveform.detach().cpu().numpy()
+    elif hasattr(waveform, "numpy"):
+        wav_np = waveform.numpy()
+    else:
+        wav_np = np.asarray(waveform, dtype=np.float32)
+
     # Preprocess with HuggingFace feature extractor
     inputs = processor(
-        waveform.numpy(),
+        wav_np,
         sampling_rate=MEL_SAMPLE_RATE,
         return_tensors="pt",
         padding=True,

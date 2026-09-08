@@ -707,7 +707,12 @@ class QualityLatencyAnalyst:
             QualityLatencyResult with per-signal scores and aggregates.
         """
         torch = _torch()
-        waveform_np = waveform.numpy().astype(np.float32)
+        if hasattr(waveform, "detach"):
+            waveform_np = waveform.detach().cpu().numpy().astype(np.float32)
+        elif hasattr(waveform, "numpy"):
+            waveform_np = waveform.numpy().astype(np.float32)
+        else:
+            waveform_np = np.asarray(waveform, dtype=np.float32)
 
         result = QualityLatencyResult()
 

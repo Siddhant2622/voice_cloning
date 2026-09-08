@@ -218,7 +218,12 @@ class LivenessScorer:
               - 'jitter_score': float
               - 'contrast_score': float
         """
-        waveform_np = waveform.numpy().astype(np.float32)
+        if hasattr(waveform, "detach"):
+            waveform_np = waveform.detach().cpu().numpy().astype(np.float32)
+        elif hasattr(waveform, "numpy"):
+            waveform_np = waveform.numpy().astype(np.float32)
+        else:
+            waveform_np = np.asarray(waveform, dtype=np.float32)
 
         flatness = spectral_flatness_score(waveform_np, sr=sr)
 

@@ -1,25 +1,17 @@
 name: "🚀 Train VoiceGuard CM on GitHub Actions"
 
 on:
-  # Manual trigger from GitHub Actions UI
+  # Manual trigger from GitHub Actions UI (Cloud GPU recommended; see cloud_training_guide.md)
   workflow_dispatch:
     inputs:
       epochs:
         description: "Number of training epochs"
-        default: "50"
+        default: "10"
         required: false
       hf_repo:
         description: "Hugging Face repo ID to push checkpoint (e.g. username/voiceguard-cm)"
         default: ""
         required: false
-
-  # Auto-trigger when training config changes
-  push:
-    branches: [main]
-    paths:
-      - "training/train_cm.py"
-      - "src/models/cm_classifier.py"
-      - "src/features.py"
 
 jobs:
   train:

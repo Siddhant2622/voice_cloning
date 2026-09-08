@@ -1091,6 +1091,9 @@ function initConnection() {
     ws.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data);
+        if (data.type === 'error') {
+          console.warn('VoiceGuard detection warning:', data.detail || data.message);
+        }
         handleScore(data);
       } catch (e) {}
     };
@@ -1308,6 +1311,11 @@ async function startMic() {
     const inputData = e.inputBuffer.getChannelData(0);
     const resampled = downsampleBuffer(inputData, audioCtx.sampleRate, 16000);
 
+    // Keep rolling buffer for AI Voice Analyst tab
+    for (let i = 0; i < resampled.length; i++) analystSamples.push(resampled[i]);
+    if (analystSamples.length > 16000 * 30) analystSamples = analystSamples.slice(-16000 * 30);
+    analystSampleRate = 16000;
+
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
       const int16 = floatTo16Bit(resampled);
       ws.send(int16.buffer);
@@ -1449,12 +1457,15 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
     const chunk = rawData.slice(offset, offset + CHUNK);
     offset += CHUNK;
 
+    const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
+    for (let i = 0; i < resampled.length; i++) analystSamples.push(resampled[i]);
+    if (analystSamples.length > 16000 * 30) analystSamples = analystSamples.slice(-16000 * 30);
+    analystSampleRate = 16000;
+
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
-      const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
       const int16 = floatTo16Bit(resampled);
       ws.send(int16.buffer);
     } else {
-      const resampled = downsampleBuffer(chunk, audioBuffer.sampleRate, 16000);
       const analysis = analyzeAudioChunk(resampled, 16000) || { latency: 15 };
       evaluateEdgeRisk(analysis, profile);
     }

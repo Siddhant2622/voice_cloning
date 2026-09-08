@@ -321,3 +321,19 @@ def preprocess_chunk(
 
     waveform = rms_normalize(waveform)
     return waveform
+
+
+def preprocess_waveform(
+    waveform: "torch.Tensor",
+    sr: int,
+    apply_vad_flag: bool = True,
+) -> "torch.Tensor":
+    """
+    Preprocess an in-memory waveform tensor: to mono 16k, VAD, RMS normalise.
+    """
+    waveform = to_mono_16k(waveform, sr)
+    if apply_vad_flag:
+        waveform = apply_vad(waveform, TARGET_SR)
+    waveform = rms_normalize(waveform)
+    return waveform
+

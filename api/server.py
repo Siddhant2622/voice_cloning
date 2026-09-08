@@ -27,6 +27,8 @@ import os
 import struct
 import sys
 import time
+import uuid
+import numpy as np
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -237,9 +239,15 @@ async def analyze_file(
     try:
         import torch
         import torchaudio
+        import soundfile as sf
 
         buf = io.BytesIO(audio_bytes)
-        waveform, sr = torchaudio.load(buf)
+        try:
+            data, sr = sf.read(buf, dtype="float32", always_2d=True)
+            waveform = torch.from_numpy(data.T)
+        except Exception:
+            buf.seek(0)
+            waveform, sr = torchaudio.load(buf)
         duration_s = waveform.shape[-1] / sr
 
         from src.preprocessing import preprocess_waveform
@@ -249,6 +257,15 @@ async def analyze_file(
         feats   = await loop.run_in_executor(None, lambda: _score_waveform(wav))
         latency = (time.time() - t0) * 1000
 
+        analyst_dict = None
+        try:
+            from src.quality_latency_analyst import VoiceQualityLatencyAnalyst
+            analyst = VoiceQualityLatencyAnalyst()
+            analyst_res = analyst.analyze(wav, sr=16000)
+            analyst_dict = analyst_res.to_dict()
+        except Exception as a_err:
+            logger.debug("Analyst computation skipped: %s", a_err)
+
         return {
             "filename":       file.filename or "unknown",
             "duration_s":     round(duration_s, 2),
@@ -257,7 +274,7 @@ async def analyze_file(
             "fusion_score":   feats["fusion_score"],
             "decision":       feats["decision"],
             "latency_ms":     round(latency, 1),
-            "analyst":        feats.get("analyst"),
+            "analyst":        analyst_dict,
             "timestamp":      datetime.now(timezone.utc).isoformat(),
         }
 
@@ -271,24 +288,45 @@ async def analyze_file(
 
 def _score_waveform(wav) -> Dict:
     """Run CM + liveness + fusion synchronously (called in executor)."""
-    from src.features import extract_all
+    import numpy as np
     import torch
+    from src.features import extract_all
+    from src.fusion import ScoreBundle
+    from src.risk_engine import RiskContext
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    feats  = extract_all(wav, device=device)
+    if not isinstance(wav, torch.Tensor):
+        wav = torch.from_numpy(np.asarray(wav, dtype=np.float32))
 
+    feats = extract_all(wav, device=device)
     cm_score = _models["cm"].score(feats)
-    lv_score = _models["lv"].score(wav.numpy() if hasattr(wav, "numpy") else wav)
-    sv_score = 0.5  # default when no enrollment reference
 
-    fs = _models["fusion"].fuse(cm_score=cm_score, liveness_score=lv_score, sv_score=sv_score)
-    decision = _models["risk"].decide(fusion_score=fs)
+    lv_result = {}
+    liveness_score = None
+    try:
+        lv_result = _models["lv"].score(wav)
+        liveness_score = lv_result.get("liveness_score")
+    except Exception as exc:
+        logger.warning("Liveness analysis failed: %s", exc)
+
+    bundle = ScoreBundle(
+        cm_score=cm_score,
+        sv_score=None,
+        liveness_score=liveness_score,
+        flatness_score=lv_result.get("flatness_score"),
+        jitter_score=lv_result.get("jitter_score"),
+        contrast_score=lv_result.get("contrast_score"),
+    )
+    fs = _models["fusion"].score(bundle)
+    ctx = RiskContext(fusion_score=fs)
+    decision = _models["risk"].decide(ctx)
 
     return {
         "cm_score":       round(cm_score, 4),
-        "liveness_score": round(lv_score, 4),
+        "liveness_score": round(liveness_score, 4) if liveness_score is not None else 0.05,
         "fusion_score":   round(fs, 4),
-        "decision":       decision,
+        "decision":       decision.action.value,
+        "reason":         decision.reason,
     }
 
 
@@ -335,21 +373,15 @@ async def ws_stream(ws: WebSocket):
 
     Client sends raw PCM audio chunks (16-bit LE, 16 kHz, mono).
     Server responds with JSON score objects.
-
-    Message format (client → server):
-        Binary: 2-byte sample count (uint16 LE) + raw 16-bit PCM samples
-
-    Message format (server → client):
-        JSON: {"type":"score","fusion_score":0.3,"cm_score":0.2,"liveness_score":0.1,
-               "decision":"ALLOW","latency_ms":45,"window":1}
     """
     await ws.accept()
-    logger.info("WebSocket client connected: %s", ws.client)
+    session_id = str(uuid.uuid4())
+    logger.info("WebSocket client connected: %s (session %s)", ws.client, session_id)
 
-    SR       = 16_000
-    CHUNK_MS = 100
-    buffer   = bytearray()
-    window   = 0
+    WINDOW_SAMPLES = 16_000 * 1    # 1.0-second analysis window
+    HOP_SAMPLES    = 8_000         # 0.5-second hop
+    audio_buffer = np.array([], dtype=np.float32)
+    window = 0
     session_ema = 0.05
 
     try:
@@ -363,47 +395,87 @@ async def ws_stream(ws: WebSocket):
             if msg.get("type") == "websocket.disconnect":
                 break
 
+            # Handle text control frames (e.g. reset or ping)
+            if "text" in msg and msg["text"]:
+                try:
+                    ctrl = json.loads(msg["text"])
+                    cmd = ctrl.get("cmd")
+                    if cmd == "reset":
+                        audio_buffer = np.array([], dtype=np.float32)
+                        window = 0
+                        session_ema = 0.05
+                        await ws.send_json({"type": "info", "message": "Session reset."})
+                        continue
+                    elif cmd == "ping":
+                        await ws.send_json({"type": "pong"})
+                        continue
+                except Exception:
+                    pass
+
             data = msg.get("bytes") or b""
             if not data:
                 continue
 
-            buffer.extend(data)
-            chunk_samples = int(SR * CHUNK_MS / 1000)
-            chunk_bytes   = chunk_samples * 2  # 16-bit
+            chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+            audio_buffer = np.concatenate([audio_buffer, chunk])
 
-            while len(buffer) >= chunk_bytes:
-                chunk_raw = bytes(buffer[:chunk_bytes])
-                del buffer[:chunk_bytes]
+            # Process when we have a full window
+            while len(audio_buffer) >= WINDOW_SAMPLES:
+                window_np = audio_buffer[:WINDOW_SAMPLES]
+                audio_buffer = audio_buffer[HOP_SAMPLES:]
 
                 t0 = time.time()
+                window += 1
+
+                # Energy gating for ambient silence
+                raw_rms = float(np.sqrt(np.mean(window_np ** 2)))
+                max_amp = float(np.max(np.abs(window_np)))
+
+                if raw_rms < 0.005 and max_amp < 0.025:
+                    session_ema = 0.80 * session_ema + 0.20 * 0.05
+                    await ws.send_json({
+                        "type":           "score",
+                        "timestamp":      datetime.now(timezone.utc).isoformat(),
+                        "window":         window,
+                        "window_index":   window,
+                        "cm_score":       0.04,
+                        "liveness_score": 0.05,
+                        "sv_score":       None,
+                        "fusion_score":   round(session_ema, 4),
+                        "decision":       "ALLOW",
+                        "reason":         "Silence / ambient room acoustics.",
+                        "latency_ms":     0.5,
+                    })
+                    continue
+
                 try:
-                    import numpy as np
                     import torch
+                    from src.preprocessing import rms_normalize
+                    wav = torch.from_numpy(window_np)
+                    wav = rms_normalize(wav)
 
-                    samples = np.frombuffer(chunk_raw, dtype=np.int16).astype(np.float32) / 32768.0
-                    wav     = torch.from_numpy(samples)
-
-                    loop  = asyncio.get_event_loop()
+                    loop = asyncio.get_event_loop()
                     scores = await loop.run_in_executor(None, _score_waveform, wav)
 
                     fusion = scores["fusion_score"]
-                    # EMA smoothing
-                    session_ema = 0.8 * session_ema + 0.2 * fusion
-
-                    window += 1
-                    latency = (time.time() - t0) * 1000
+                    session_ema = 0.65 * fusion + 0.35 * session_ema
+                    latency = (time.time() - t0) * 1000.0
 
                     await ws.send_json({
                         "type":           "score",
+                        "timestamp":      datetime.now(timezone.utc).isoformat(),
+                        "window":         window,
+                        "window_index":   window,
                         "fusion_score":   round(session_ema, 4),
                         "cm_score":       scores["cm_score"],
                         "liveness_score": scores["liveness_score"],
+                        "sv_score":       None,
                         "decision":       scores["decision"],
+                        "reason":         scores.get("reason", ""),
                         "latency_ms":     round(latency, 1),
-                        "window":         window,
                     })
                 except Exception as exc:
-                    logger.warning("Scoring error: %s", exc)
+                    logger.warning("Scoring error: %s", exc, exc_info=True)
                     await ws.send_json({"type": "error", "detail": str(exc)})
 
     except WebSocketDisconnect:
