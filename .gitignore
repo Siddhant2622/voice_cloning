@@ -50,6 +50,7 @@ data/ASVspoof*
 data/*.tar
 data/*.tar.gz
 data/*.zip
+data/features_cache.pt
 
 # Decision logs (keep directory, ignore generated runtime logs)
 logs/*.jsonl

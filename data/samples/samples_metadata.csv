@@ -1,20 +1,24 @@
 file,label,source,text
-bonafide_00.wav,bonafide,pyttsx3_fast,
-bonafide_01.wav,bonafide,pyttsx3_fast,
-synthetic_00.wav,spoof,pyttsx3,
-synthetic_01.wav,spoof,pyttsx3,
-synthetic_02.wav,spoof,pyttsx3,
-synthetic_03.wav,spoof,pyttsx3,
-synthetic_04.wav,spoof,pyttsx3,
+bonafide_00.wav,bonafide,librispeech_human,human voice recording
+bonafide_01.wav,bonafide,librispeech_human,human voice recording
 human_librispeech_00.wav,bonafide,librispeech_human,human voice recording
 human_librispeech_01.wav,bonafide,librispeech_human,human voice recording
 human_librispeech_02.wav,bonafide,librispeech_human,human voice recording
 human_librispeech_03.wav,bonafide,librispeech_human,human voice recording
-neural_tts_00.wav,spoof,neural_tts_en-US-JennyNeural,"Hello, I am verifying my account details for the transaction."
-neural_tts_01.wav,spoof,neural_tts_en-US-GuyNeural,Please transfer seventy thousand dollars to the authorized account immediately.
-neural_tts_02.wav,spoof,neural_tts_en-US-AriaNeural,I am calling to update the wire transfer beneficiary information on file.
-neural_tts_03.wav,spoof,neural_tts_en-GB-SoniaNeural,Could you confirm whether the security clearance has been granted for this session?
-neural_tts_04.wav,spoof,neural_tts_en-GB-RyanNeural,"My authentication code has expired, please issue an override for this request."
-neural_tts_05.wav,spoof,neural_tts_en-IN-NeerjaNeural,"Good afternoon, I need urgent assistance with approving this international payment."
-neural_tts_06.wav,spoof,neural_tts_en-IN-PrabhatNeural,"The executive team approved the wire transfer earlier today, please proceed."
-neural_tts_07.wav,spoof,neural_tts_en-AU-NatashaNeural,We have verified the customer credentials and need to finalize the transfer.
+human_librispeech_04.wav,bonafide,librispeech_human,human voice recording
+human_librispeech_05.wav,bonafide,librispeech_human,human voice recording
+human_librispeech_06.wav,bonafide,librispeech_human,human voice recording
+human_librispeech_07.wav,bonafide,librispeech_human,human voice recording
+neural_tts_00.wav,spoof,neural_tts_00,neural tts voice clone
+neural_tts_01.wav,spoof,neural_tts_01,neural tts voice clone
+neural_tts_02.wav,spoof,neural_tts_02,neural tts voice clone
+neural_tts_03.wav,spoof,neural_tts_03,neural tts voice clone
+neural_tts_04.wav,spoof,neural_tts_04,neural tts voice clone
+neural_tts_05.wav,spoof,neural_tts_05,neural tts voice clone
+neural_tts_06.wav,spoof,neural_tts_06,neural tts voice clone
+neural_tts_07.wav,spoof,neural_tts_07,neural tts voice clone
+synthetic_00.wav,spoof,pyttsx3,synthetic speech
+synthetic_01.wav,spoof,pyttsx3,synthetic speech
+synthetic_02.wav,spoof,pyttsx3,synthetic speech
+synthetic_03.wav,spoof,pyttsx3,synthetic speech
+synthetic_04.wav,spoof,pyttsx3,synthetic speech

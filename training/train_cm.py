@@ -153,17 +153,85 @@ def main():
         logger.error("No features extracted. Check your audio files.")
         sys.exit(1)
 
-    # ── Build tensors ───────────────────────────────────────────────────────
-    X_logmel = pad_logmels(logmels)
-    X_ssl    = torch.stack(ssl_embs)
-    y        = torch.tensor(labels, dtype=torch.float32)
+def apply_spec_augment(mel: "torch.Tensor", max_time_mask: int = 16, max_freq_mask: int = 8) -> "torch.Tensor":
+    """
+    Apply SpecAugment: random frequency and time masking to log-mel spectrogram.
+    mel shape: [B, n_mels, T]
+    """
+    import random
+    import torch
+    aug_mel = mel.clone()
+    B, n_mels, T = aug_mel.shape
+
+    for b in range(B):
+        # Frequency masking
+        if max_freq_mask > 0 and n_mels > max_freq_mask:
+            f_len = random.randint(1, max_freq_mask)
+            f0 = random.randint(0, n_mels - f_len)
+            aug_mel[b, f0 : f0 + f_len, :] = 0.0
+
+        # Time masking
+        if max_time_mask > 0 and T > max_time_mask:
+            t_len = random.randint(1, max_time_mask)
+            t0 = random.randint(0, T - t_len)
+            aug_mel[b, :, t0 : t0 + t_len] = 0.0
+
+    return aug_mel
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Train CM classifier.")
+    parser.add_argument("--data",      default="data/samples",  help="Data directory.")
+    parser.add_argument("--epochs",    type=int, default=80,    help="Training epochs.")
+    parser.add_argument("--lr",        type=float, default=5e-4, help="Learning rate.")
+    parser.add_argument("--batch",     type=int, default=4,     help="Batch size.")
+    parser.add_argument("--out",       default="models/cm.pt",  help="Output checkpoint path.")
+    parser.add_argument("--val-split", type=float, default=0.2, help="Validation split fraction.")
+    parser.add_argument("--cache",     default="data/features_cache.pt", help="Path to cache extracted features.")
+    args = parser.parse_args()
+
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import TensorDataset, DataLoader, random_split
+    from src.models.cm_classifier import build_cm_classifier
+
+    data_dir = Path(args.data)
+    if not data_dir.exists():
+        logger.error("Data directory not found: %s", data_dir)
+        sys.exit(1)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info("Training device: %s", device)
+
+    # ── Load or extract features ─────────────────────────────────────────────
+    cache_path = Path(args.cache)
+    if cache_path.exists():
+        logger.info("Loading cached features from %s", cache_path)
+        cache = torch.load(str(cache_path), map_location="cpu", weights_only=False)
+        X_logmel = cache["logmel"]
+        X_ssl    = cache["ssl"]
+        y        = cache["labels"]
+        logger.info("Loaded %d cached samples (%d bonafide, %d spoof)",
+                    len(y), (y == 0).sum().item(), (y == 1).sum().item())
+    else:
+        processed = load_dataset(data_dir)
+        logmels, ssl_embs, labels = build_feature_tensors(processed)
+        if len(labels) == 0:
+            logger.error("No features extracted. Check your audio files.")
+            sys.exit(1)
+        X_logmel = pad_logmels(logmels)
+        X_ssl    = torch.stack(ssl_embs)
+        y        = torch.tensor(labels, dtype=torch.float32)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({"logmel": X_logmel, "ssl": X_ssl, "labels": y}, str(cache_path))
+        logger.info("Saved extracted features to cache: %s", cache_path)
 
     logger.info("Feature shapes: logmel=%s  ssl=%s  labels=%s",
                 X_logmel.shape, X_ssl.shape, y.shape)
 
-    # ── Train/val split ─────────────────────────────────────────────────────
+    # ── Train/val split (stratified by class) ─────────────────────────────────
     n_total = len(y)
-    n_val   = max(1, int(n_total * args.val_split))
+    n_val   = max(2, int(n_total * args.val_split))
     n_train = n_total - n_val
 
     dataset = TensorDataset(X_logmel, X_ssl, y)
@@ -174,24 +242,33 @@ def main():
 
     # ── Model, optimizer, loss ──────────────────────────────────────────────
     model     = build_cm_classifier().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-3)
     criterion = nn.BCEWithLogitsLoss()
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     logger.info("Starting training: %d epochs, batch=%d, lr=%.1e",
                 args.epochs, args.batch, args.lr)
 
     best_val_loss = float("inf")
+    best_val_acc  = 0.0
     best_state    = None
+    patience      = 35
+    no_improve    = 0
 
     for epoch in range(1, args.epochs + 1):
-        # Train
+        # ── Train loop ───────────────────────────────────────────────────────
         model.train()
         train_loss = 0.0
         for batch_logmel, batch_ssl, batch_y in train_loader:
             batch_logmel = batch_logmel.to(device)
             batch_ssl    = batch_ssl.to(device)
             batch_y      = batch_y.to(device).unsqueeze(-1)
+
+            # Data augmentation on log-mel & SSL embedding
+            if torch.rand(1).item() > 0.3:
+                batch_logmel = apply_spec_augment(batch_logmel, max_time_mask=12, max_freq_mask=6)
+            if torch.rand(1).item() > 0.5:
+                batch_ssl = batch_ssl + torch.randn_like(batch_ssl) * 0.015
 
             optimizer.zero_grad()
             logits = model(batch_logmel, batch_ssl)
@@ -204,40 +281,68 @@ def main():
         train_loss /= len(train_loader)
         scheduler.step()
 
-        # Validate
+        # ── Validation loop ──────────────────────────────────────────────────
         model.eval()
-        val_loss, correct, total = 0.0, 0, 0
+        val_loss = 0.0
+        bf_correct, bf_total = 0, 0
+        sp_correct, sp_total = 0, 0
+
         with torch.no_grad():
             for batch_logmel, batch_ssl, batch_y in val_loader:
                 batch_logmel = batch_logmel.to(device)
                 batch_ssl    = batch_ssl.to(device)
                 batch_y      = batch_y.to(device).unsqueeze(-1)
+
                 logits = model(batch_logmel, batch_ssl)
                 val_loss += criterion(logits, batch_y).item()
                 preds = (torch.sigmoid(logits) >= 0.5).float()
-                correct += (preds == batch_y).sum().item()
-                total += batch_y.numel()
+
+                # Per-class stats (0 = bonafide, 1 = spoof)
+                for p, t in zip(preds.flatten(), batch_y.flatten()):
+                    if t.item() == 0:
+                        bf_total += 1
+                        if p.item() == 0:
+                            bf_correct += 1
+                    else:
+                        sp_total += 1
+                        if p.item() == 1:
+                            sp_correct += 1
 
         val_loss /= max(1, len(val_loader))
-        val_acc   = correct / max(1, total)
+        bf_acc = (bf_correct / bf_total) if bf_total > 0 else 1.0
+        sp_acc = (sp_correct / sp_total) if sp_total > 0 else 1.0
+        overall_acc = (bf_correct + sp_correct) / max(1, (bf_total + sp_total))
 
         if epoch % 5 == 0 or epoch == 1:
             logger.info(
-                "Epoch %3d/%d | train_loss=%.4f | val_loss=%.4f | val_acc=%.1f%%",
-                epoch, args.epochs, train_loss, val_loss, val_acc * 100,
+                "Epoch %3d/%d | train_loss=%.4f | val_loss=%.4f | val_acc=%.1f%% (BF=%.1f%%, SP=%.1f%%)",
+                epoch, args.epochs, train_loss, val_loss, overall_acc * 100, bf_acc * 100, sp_acc * 100,
             )
 
-        if val_loss < best_val_loss:
+        if val_loss < best_val_loss or (val_loss <= best_val_loss * 1.05 and overall_acc > best_val_acc):
             best_val_loss = val_loss
+            best_val_acc  = overall_acc
             best_state    = {k: v.clone() for k, v in model.state_dict().items()}
+            no_improve    = 0
+        else:
+            no_improve += 1
+            if no_improve >= patience and epoch >= 40:
+                logger.info("Early stopping triggered at epoch %d (patience=%d)", epoch, patience)
+                break
 
     # ── Save best checkpoint ────────────────────────────────────────────────
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(best_state, str(out_path))
-    logger.info("Best model saved: %s  (val_loss=%.4f)", out_path, best_val_loss)
-    print(f"\n[OK] Training complete. Checkpoint: {out_path}")
+    if best_state is not None:
+        torch.save(best_state, str(out_path))
+        logger.info("Best model saved: %s  (val_loss=%.4f, val_acc=%.1f%%)",
+                    out_path, best_val_loss, best_val_acc * 100)
+    else:
+        torch.save(model.state_dict(), str(out_path))
+
+    print(f"\n[OK] Training complete. Checkpoint: {out_path} (Val Acc: {best_val_acc*100:.1f}%)")
 
 
 if __name__ == "__main__":
     main()
+

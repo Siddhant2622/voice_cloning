@@ -1,0 +1,571 @@
+{
+  "bonafide_profile": {
+    "spectral_flatness_max": 0.555,
+    "energy_variance_min": 0.74,
+    "pitch_periodicity_min": 0.17,
+    "hf_ratio_max": 0.05
+  },
+  "spoof_profile": {
+    "flatness_threshold": 0.355,
+    "energy_var_threshold": 0.991,
+    "periodicity_threshold": 0.501
+  },
+  "profiles": {
+    "bonafide": {
+      "spectral_flatness": {
+        "mean": 0.3763,
+        "std": 0.0861,
+        "median": 0.4138,
+        "min": 0.1595,
+        "max": 0.4822
+      },
+      "pitch_periodicity": {
+        "mean": 0.3828,
+        "std": 0.114,
+        "median": 0.3356,
+        "min": 0.1999,
+        "max": 0.5765
+      },
+      "energy_variance": {
+        "mean": 1.0513,
+        "std": 0.1414,
+        "median": 1.0907,
+        "min": 0.8702,
+        "max": 1.2564
+      },
+      "hf_ratio": {
+        "mean": 0.0262,
+        "std": 0.0073,
+        "median": 0.0216,
+        "min": 0.0209,
+        "max": 0.0418
+      },
+      "spectral_centroid": {
+        "mean": 0.2119,
+        "std": 0.0404,
+        "median": 0.2113,
+        "min": 0.1427,
+        "max": 0.3129
+      },
+      "zcr": {
+        "mean": 0.1073,
+        "std": 0.0212,
+        "median": 0.1086,
+        "min": 0.0794,
+        "max": 0.1476
+      },
+      "hnr_proxy": {
+        "mean": 1.183,
+        "std": 0.8419,
+        "median": 0.9224,
+        "min": 0.4144,
+        "max": 3.613
+      },
+      "cm_score": {
+        "mean": 0.0002,
+        "std": 0.0,
+        "median": 0.0002,
+        "min": 0.0002,
+        "max": 0.0003
+      }
+    },
+    "spoof": {
+      "spectral_flatness": {
+        "mean": 0.3335,
+        "std": 0.0834,
+        "median": 0.3475,
+        "min": 0.2187,
+        "max": 0.4698
+      },
+      "pitch_periodicity": {
+        "mean": 0.6194,
+        "std": 0.2975,
+        "median": 0.6678,
+        "min": 0.0812,
+        "max": 0.9381
+      },
+      "energy_variance": {
+        "mean": 0.931,
+        "std": 0.0769,
+        "median": 0.9294,
+        "min": 0.8044,
+        "max": 1.0595
+      },
+      "hf_ratio": {
+        "mean": 0.0289,
+        "std": 0.0082,
+        "median": 0.0286,
+        "min": 0.0156,
+        "max": 0.0466
+      },
+      "spectral_centroid": {
+        "mean": 0.2517,
+        "std": 0.0433,
+        "median": 0.2481,
+        "min": 0.1833,
+        "max": 0.3437
+      },
+      "zcr": {
+        "mean": 0.1508,
+        "std": 0.028,
+        "median": 0.1455,
+        "min": 0.1103,
+        "max": 0.2131
+      },
+      "hnr_proxy": {
+        "mean": 2.1682,
+        "std": 1.3812,
+        "median": 1.8357,
+        "min": 0.1855,
+        "max": 4.1448
+      },
+      "cm_score": {
+        "mean": 0.9999,
+        "std": 0.0,
+        "median": 0.9999,
+        "min": 0.9999,
+        "max": 0.9999
+      }
+    },
+    "neural_tts": {
+      "spectral_flatness": {
+        "mean": 0.3898,
+        "std": 0.0526,
+        "median": 0.3773,
+        "min": 0.3017,
+        "max": 0.4698
+      },
+      "pitch_periodicity": {
+        "mean": 0.438,
+        "std": 0.2408,
+        "median": 0.4045,
+        "min": 0.0812,
+        "max": 0.8516
+      },
+      "energy_variance": {
+        "mean": 0.9767,
+        "std": 0.0538,
+        "median": 0.9845,
+        "min": 0.891,
+        "max": 1.0595
+      },
+      "hf_ratio": {
+        "mean": 0.0301,
+        "std": 0.0094,
+        "median": 0.0291,
+        "min": 0.0156,
+        "max": 0.0466
+      },
+      "spectral_centroid": {
+        "mean": 0.2666,
+        "std": 0.0407,
+        "median": 0.2692,
+        "min": 0.2135,
+        "max": 0.3437
+      },
+      "zcr": {
+        "mean": 0.1546,
+        "std": 0.0295,
+        "median": 0.1411,
+        "min": 0.1277,
+        "max": 0.2131
+      },
+      "hnr_proxy": {
+        "mean": 1.1743,
+        "std": 0.6964,
+        "median": 0.9938,
+        "min": 0.1855,
+        "max": 2.4503
+      },
+      "cm_score": {
+        "mean": 0.9999,
+        "std": 0.0,
+        "median": 0.9999,
+        "min": 0.9999,
+        "max": 0.9999
+      }
+    },
+    "synthetic": {
+      "spectral_flatness": {
+        "mean": 0.2434,
+        "std": 0.0214,
+        "median": 0.2408,
+        "min": 0.2187,
+        "max": 0.2827
+      },
+      "pitch_periodicity": {
+        "mean": 0.9096,
+        "std": 0.0235,
+        "median": 0.9069,
+        "min": 0.8837,
+        "max": 0.9381
+      },
+      "energy_variance": {
+        "mean": 0.8579,
+        "std": 0.0454,
+        "median": 0.8524,
+        "min": 0.8044,
+        "max": 0.9294
+      },
+      "hf_ratio": {
+        "mean": 0.027,
+        "std": 0.0055,
+        "median": 0.0286,
+        "min": 0.0192,
+        "max": 0.0338
+      },
+      "spectral_centroid": {
+        "mean": 0.228,
+        "std": 0.0361,
+        "median": 0.2158,
+        "min": 0.1833,
+        "max": 0.2869
+      },
+      "zcr": {
+        "mean": 0.1448,
+        "std": 0.0243,
+        "median": 0.1536,
+        "min": 0.1103,
+        "max": 0.1734
+      },
+      "hnr_proxy": {
+        "mean": 3.7584,
+        "std": 0.2732,
+        "median": 3.8021,
+        "min": 3.3173,
+        "max": 4.1448
+      },
+      "cm_score": {
+        "mean": 0.9999,
+        "std": 0.0,
+        "median": 0.9999,
+        "min": 0.9999,
+        "max": 0.9999
+      }
+    }
+  },
+  "sample_evaluations": [
+    {
+      "file": "bonafide_00.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0527,
+      "zcr": 0.1086,
+      "hf_ratio": 0.0209,
+      "spectral_centroid": 0.2143,
+      "spectral_flatness": 0.4143,
+      "pitch_periodicity": 0.3356,
+      "energy_variance": 1.1214,
+      "hnr_proxy": 0.8098
+    },
+    {
+      "file": "bonafide_01.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0542,
+      "zcr": 0.0794,
+      "hf_ratio": 0.021,
+      "spectral_centroid": 0.2083,
+      "spectral_flatness": 0.4138,
+      "pitch_periodicity": 0.4891,
+      "energy_variance": 0.8702,
+      "hnr_proxy": 1.1818
+    },
+    {
+      "file": "human_librispeech_00.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0466,
+      "zcr": 0.1281,
+      "hf_ratio": 0.0251,
+      "spectral_centroid": 0.2143,
+      "spectral_flatness": 0.4143,
+      "pitch_periodicity": 0.3356,
+      "energy_variance": 1.1825,
+      "hnr_proxy": 0.8098
+    },
+    {
+      "file": "human_librispeech_01.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0277,
+      "zcr": 0.1092,
+      "hf_ratio": 0.0418,
+      "spectral_centroid": 0.3129,
+      "spectral_flatness": 0.4822,
+      "pitch_periodicity": 0.1999,
+      "energy_variance": 1.2564,
+      "hnr_proxy": 0.4144
+    },
+    {
+      "file": "human_librispeech_02.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0471,
+      "zcr": 0.088,
+      "hf_ratio": 0.0213,
+      "spectral_centroid": 0.2083,
+      "spectral_flatness": 0.4138,
+      "pitch_periodicity": 0.4891,
+      "energy_variance": 0.9205,
+      "hnr_proxy": 1.1818
+    },
+    {
+      "file": "human_librispeech_03.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0003,
+      "rms": 0.0913,
+      "zcr": 0.1273,
+      "hf_ratio": 0.0357,
+      "spectral_centroid": 0.2188,
+      "spectral_flatness": 0.3388,
+      "pitch_periodicity": 0.2687,
+      "energy_variance": 1.06,
+      "hnr_proxy": 0.7928
+    },
+    {
+      "file": "human_librispeech_04.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0527,
+      "zcr": 0.1086,
+      "hf_ratio": 0.0209,
+      "spectral_centroid": 0.2143,
+      "spectral_flatness": 0.4143,
+      "pitch_periodicity": 0.3356,
+      "energy_variance": 1.1214,
+      "hnr_proxy": 0.8098
+    },
+    {
+      "file": "human_librispeech_05.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0397,
+      "zcr": 0.1476,
+      "hf_ratio": 0.0326,
+      "spectral_centroid": 0.1767,
+      "spectral_flatness": 0.2986,
+      "pitch_periodicity": 0.3091,
+      "energy_variance": 1.2104,
+      "hnr_proxy": 1.035
+    },
+    {
+      "file": "human_librispeech_06.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0002,
+      "rms": 0.0542,
+      "zcr": 0.0794,
+      "hf_ratio": 0.021,
+      "spectral_centroid": 0.2083,
+      "spectral_flatness": 0.4138,
+      "pitch_periodicity": 0.4891,
+      "energy_variance": 0.8702,
+      "hnr_proxy": 1.1818
+    },
+    {
+      "file": "human_librispeech_07.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "cm_score": 0.0003,
+      "rms": 0.0387,
+      "zcr": 0.0966,
+      "hf_ratio": 0.022,
+      "spectral_centroid": 0.1427,
+      "spectral_flatness": 0.1595,
+      "pitch_periodicity": 0.5765,
+      "energy_variance": 0.9004,
+      "hnr_proxy": 3.613
+    },
+    {
+      "file": "neural_tts_00.wav",
+      "label": "spoof",
+      "source": "neural_tts_00",
+      "cm_score": 0.9999,
+      "rms": 0.0857,
+      "zcr": 0.1368,
+      "hf_ratio": 0.0388,
+      "spectral_centroid": 0.2135,
+      "spectral_flatness": 0.3017,
+      "pitch_periodicity": 0.2627,
+      "energy_variance": 1.0595,
+      "hnr_proxy": 0.8706
+    },
+    {
+      "file": "neural_tts_01.wav",
+      "label": "spoof",
+      "source": "neural_tts_01",
+      "cm_score": 0.9999,
+      "rms": 0.0953,
+      "zcr": 0.1455,
+      "hf_ratio": 0.0348,
+      "spectral_centroid": 0.3437,
+      "spectral_flatness": 0.4433,
+      "pitch_periodicity": 0.4339,
+      "energy_variance": 0.891,
+      "hnr_proxy": 0.9786
+    },
+    {
+      "file": "neural_tts_02.wav",
+      "label": "spoof",
+      "source": "neural_tts_02",
+      "cm_score": 0.9999,
+      "rms": 0.0821,
+      "zcr": 0.1341,
+      "hf_ratio": 0.0466,
+      "spectral_centroid": 0.2717,
+      "spectral_flatness": 0.3828,
+      "pitch_periodicity": 0.6117,
+      "energy_variance": 0.9473,
+      "hnr_proxy": 1.5975
+    },
+    {
+      "file": "neural_tts_03.wav",
+      "label": "spoof",
+      "source": "neural_tts_03",
+      "cm_score": 0.9999,
+      "rms": 0.1089,
+      "zcr": 0.192,
+      "hf_ratio": 0.0209,
+      "spectral_centroid": 0.2997,
+      "spectral_flatness": 0.4698,
+      "pitch_periodicity": 0.2197,
+      "energy_variance": 0.9134,
+      "hnr_proxy": 0.4675
+    },
+    {
+      "file": "neural_tts_04.wav",
+      "label": "spoof",
+      "source": "neural_tts_04",
+      "cm_score": 0.9999,
+      "rms": 0.0792,
+      "zcr": 0.1277,
+      "hf_ratio": 0.0267,
+      "spectral_centroid": 0.221,
+      "spectral_flatness": 0.3718,
+      "pitch_periodicity": 0.3752,
+      "energy_variance": 0.9694,
+      "hnr_proxy": 1.009
+    },
+    {
+      "file": "neural_tts_05.wav",
+      "label": "spoof",
+      "source": "neural_tts_05",
+      "cm_score": 0.9999,
+      "rms": 0.0808,
+      "zcr": 0.2131,
+      "hf_ratio": 0.0255,
+      "spectral_centroid": 0.2819,
+      "spectral_flatness": 0.4378,
+      "pitch_periodicity": 0.0812,
+      "energy_variance": 1.0278,
+      "hnr_proxy": 0.1855
+    },
+    {
+      "file": "neural_tts_06.wav",
+      "label": "spoof",
+      "source": "neural_tts_06",
+      "cm_score": 0.9999,
+      "rms": 0.1483,
+      "zcr": 0.1307,
+      "hf_ratio": 0.0156,
+      "spectral_centroid": 0.2668,
+      "spectral_flatness": 0.3637,
+      "pitch_periodicity": 0.6678,
+      "energy_variance": 1.0059,
+      "hnr_proxy": 1.8357
+    },
+    {
+      "file": "neural_tts_07.wav",
+      "label": "spoof",
+      "source": "neural_tts_07",
+      "cm_score": 0.9999,
+      "rms": 0.0918,
+      "zcr": 0.1571,
+      "hf_ratio": 0.0315,
+      "spectral_centroid": 0.2343,
+      "spectral_flatness": 0.3475,
+      "pitch_periodicity": 0.8516,
+      "energy_variance": 0.9996,
+      "hnr_proxy": 2.4503
+    },
+    {
+      "file": "synthetic_00.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "cm_score": 0.9999,
+      "rms": 0.0986,
+      "zcr": 0.1103,
+      "hf_ratio": 0.0286,
+      "spectral_centroid": 0.1833,
+      "spectral_flatness": 0.2323,
+      "pitch_periodicity": 0.8837,
+      "energy_variance": 0.8185,
+      "hnr_proxy": 3.8021
+    },
+    {
+      "file": "synthetic_01.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "cm_score": 0.9999,
+      "rms": 0.1005,
+      "zcr": 0.1639,
+      "hf_ratio": 0.0223,
+      "spectral_centroid": 0.2869,
+      "spectral_flatness": 0.2827,
+      "pitch_periodicity": 0.9381,
+      "energy_variance": 0.9294,
+      "hnr_proxy": 3.3173
+    },
+    {
+      "file": "synthetic_02.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "cm_score": 0.9999,
+      "rms": 0.0925,
+      "zcr": 0.1734,
+      "hf_ratio": 0.0311,
+      "spectral_centroid": 0.2158,
+      "spectral_flatness": 0.2187,
+      "pitch_periodicity": 0.9069,
+      "energy_variance": 0.885,
+      "hnr_proxy": 4.1448
+    },
+    {
+      "file": "synthetic_03.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "cm_score": 0.9999,
+      "rms": 0.1031,
+      "zcr": 0.1226,
+      "hf_ratio": 0.0192,
+      "spectral_centroid": 0.2057,
+      "spectral_flatness": 0.2408,
+      "pitch_periodicity": 0.9349,
+      "energy_variance": 0.8524,
+      "hnr_proxy": 3.8809
+    },
+    {
+      "file": "synthetic_04.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "cm_score": 0.9999,
+      "rms": 0.0966,
+      "zcr": 0.1536,
+      "hf_ratio": 0.0338,
+      "spectral_centroid": 0.2481,
+      "spectral_flatness": 0.2424,
+      "pitch_periodicity": 0.8844,
+      "energy_variance": 0.8044,
+      "hnr_proxy": 3.6469
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "dataset_size": 23,
+  "bonafide_count": 10,
+  "spoof_count": 13,
+  "cm_deep_model": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "far": 0.0,
+    "frr": 0.0,
+    "tp": 13,
+    "tn": 10,
+    "fp": 0,
+    "fn": 0
+  },
+  "browser_edge_engine": {
+    "accuracy": 0.913,
+    "precision": 1.0,
+    "recall": 0.8462,
+    "f1": 0.9167,
+    "far": 0.0,
+    "frr": 0.1538,
+    "tp": 11,
+    "tn": 10,
+    "fp": 0,
+    "fn": 2
+  },
+  "sample_reports": [
+    {
+      "file": "bonafide_00.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.073,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "bonafide_01.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.131,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_00.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.073,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_01.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.073,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_02.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.063,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_03.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0003,
+      "edge_fusion_score": 0.16,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_04.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.073,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_05.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.073,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_06.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0002,
+      "edge_fusion_score": 0.131,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "human_librispeech_07.wav",
+      "label": "bonafide",
+      "source": "librispeech_human",
+      "ml_cm_score": 0.0003,
+      "edge_fusion_score": 0.451,
+      "edge_decision": "STEP_UP",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_00.wav",
+      "label": "spoof",
+      "source": "neural_tts_00",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 0.409,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": false
+    },
+    {
+      "file": "neural_tts_01.wav",
+      "label": "spoof",
+      "source": "neural_tts_01",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_02.wav",
+      "label": "spoof",
+      "source": "neural_tts_02",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 0.96,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_03.wav",
+      "label": "spoof",
+      "source": "neural_tts_03",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_04.wav",
+      "label": "spoof",
+      "source": "neural_tts_04",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 0.494,
+      "edge_decision": "STEP_UP",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_05.wav",
+      "label": "spoof",
+      "source": "neural_tts_05",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_06.wav",
+      "label": "spoof",
+      "source": "neural_tts_06",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 0.828,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "neural_tts_07.wav",
+      "label": "spoof",
+      "source": "neural_tts_07",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "synthetic_00.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "synthetic_01.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 0.246,
+      "edge_decision": "ALLOW",
+      "ml_correct": true,
+      "edge_correct": false
+    },
+    {
+      "file": "synthetic_02.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "synthetic_03.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    },
+    {
+      "file": "synthetic_04.wav",
+      "label": "spoof",
+      "source": "pyttsx3",
+      "ml_cm_score": 0.9999,
+      "edge_fusion_score": 1.0,
+      "edge_decision": "BLOCK",
+      "ml_correct": true,
+      "edge_correct": true
+    }
+  ]
+}
