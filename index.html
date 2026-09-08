@@ -1037,8 +1037,9 @@ function scoreColor(s) {
 /* ─── WebSocket & Edge Mode Connection ──────────────────────────────────── */
 function getWsUrl() {
   if (customWsUrl) return customWsUrl;
+  const host = location.host || 'localhost:8000';
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${location.host}/ws/stream`;
+  return `${protocol}//${host}/ws/stream`;
 }
 
 function initConnection() {
@@ -1467,7 +1468,8 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
 async function loadSampleUrl(url, profile) {
   try {
     inputStatus.textContent = 'Loading audio sample...';
-    const res = await fetch(url);
+    const fetchUrl = (!location.host && url.startsWith('/')) ? `http://localhost:8000${url}` : url;
+    const res = await fetch(fetchUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const arrayBuf = await res.arrayBuffer();
     const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1518,7 +1520,8 @@ function drawWaveform() {
 /* ─── Challenge Generation ───────────────────────────────────────────────── */
 async function issueChallenge() {
   try {
-    const res = await fetch('/api/challenge', {
+    const fetchUrl = (!location.host) ? 'http://localhost:8000/api/challenge' : '/api/challenge';
+    const res = await fetch(fetchUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'digits' })
@@ -1692,7 +1695,8 @@ function jsScoreBreath(samples, sr) {
     else { if (cur) runs.push(cur); cur = 0; }
   }
   if (cur) runs.push(cur);
-  if (!runs.length) return [0.85, 'no silence gaps detected — gapless (TTS)');
+  if (!runs.length) return [0.85, 'no silence gaps detected \u2014 gapless (TTS)'];
+
   const hopMs = hopLen / sr * 1000;
   const runMs = runs.map(r => r * hopMs);
   const breathLike = runMs.filter(ms => ms >= minBreathMs && ms <= maxBreathMs);
@@ -2183,7 +2187,8 @@ function initBenchmarkChart() {
   }
 
   // Also try to load real benchmark from API
-  fetch('/api/v1/benchmark')
+  const benchUrl = (!location.host) ? 'http://localhost:8000/api/v1/benchmark' : '/api/v1/benchmark';
+  fetch(benchUrl)
     .then(r => r.ok ? r.json() : null)
     .then(data => {
       if (!data) return;

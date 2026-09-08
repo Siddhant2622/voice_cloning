@@ -31,9 +31,9 @@ CELL_2 = """
 # ╔══════════════════════════════════════════════════════════╗
 # ║   EDIT THESE 3 LINES BEFORE RUNNING ANYTHING ELSE       ║
 # ╚══════════════════════════════════════════════════════════╝
-GITHUB_REPO  = "https://github.com/YOUR_USERNAME/voiceguard.git"
-HF_REPO_ID   = "YOUR_HF_USERNAME/voiceguard-cm"
-HF_TOKEN     = "hf_PASTE_YOUR_TOKEN_HERE"
+GITHUB_REPO  = "https://github.com/Siddhant2622/Voice-Cloning"
+HF_REPO_ID   = "C00EX2622/voiceguard-cm"
+HF_TOKEN     = "hf_ENTER_IN_COLAB_NOT_HERE"  # ← Type your token ONLY in Colab, never save to file
 # ─────────────────────────────────────────────────────────────
 
 import os
@@ -53,8 +53,10 @@ os.system("pip install -q -r requirements.txt")
 
 # Save config for later cells
 import json
+REPO_DIR = "/content/voiceguard"
 cfg = {"GITHUB_REPO": GITHUB_REPO, "HF_REPO_ID": HF_REPO_ID,
-       "HF_TOKEN": HF_TOKEN, "DRIVE_ROOT": DRIVE_ROOT}
+       "HF_TOKEN": HF_TOKEN, "DRIVE_ROOT": DRIVE_ROOT,
+       "REPO_DIR": REPO_DIR}
 with open("/content/cfg.json", "w") as f:
     json.dump(cfg, f)
 
@@ -120,7 +122,7 @@ with open("/content/cfg.json") as f:
     cfg = json.load(f)
 
 DRIVE_ROOT = cfg["DRIVE_ROOT"]
-os.chdir("/content/voiceguard")
+os.chdir(cfg["REPO_DIR"])
 
 result = subprocess.run([
     "python", "data/prepare_asvspoof.py",
@@ -151,7 +153,7 @@ with open("/content/cfg.json") as f:
 DRIVE_ROOT = cfg["DRIVE_ROOT"]
 OUT_MODEL  = f"{DRIVE_ROOT}/models/cm_asvspoof19.pt"
 os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
-os.chdir("/content/voiceguard")
+os.chdir(cfg["REPO_DIR"])
 
 print("Starting training... (this takes ~2-3 hours on T4 GPU)")
 print("You can close this tab — Drive saves progress automatically")

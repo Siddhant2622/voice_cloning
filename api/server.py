@@ -39,7 +39,8 @@ from fastapi import (
     UploadFile, WebSocket, WebSocketDisconnect, status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from api.auth import require_api_key
@@ -75,13 +76,13 @@ def _load_models(settings: Settings) -> None:
 
         from src.models.cm_classifier import CMScorerWrapper
         from src.models.liveness import LivenessScorer
-        from src.fusion import FusionScorer
-        from src.risk_engine import RiskEngine
+        from src.fusion import FusionModel          # was wrongly called FusionScorer
+        from src.risk_engine import PolicyEngine    # was wrongly called RiskEngine
 
         _models["cm"]     = CMScorerWrapper(checkpoint_path=ckpt if ckpt.exists() else None)
         _models["lv"]     = LivenessScorer()
-        _models["fusion"] = FusionScorer()
-        _models["risk"]   = RiskEngine()
+        _models["fusion"] = FusionModel()
+        _models["risk"]   = PolicyEngine()
 
         elapsed = time.time() - t0
         logger.info("Models loaded in %.2f s", elapsed)
@@ -147,6 +148,13 @@ def create_app() -> FastAPI:
 
 app = create_app()
 
+ROOT_DIR = Path(__file__).parent.parent
+INDEX_HTML = ROOT_DIR / "index.html"
+SAMPLES_DIR = ROOT_DIR / "public" / "samples"
+
+if SAMPLES_DIR.exists():
+    app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")
+
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -174,9 +182,18 @@ class AnalyzeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-@app.get("/", include_in_schema=False)
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
+    if INDEX_HTML.exists():
+        return HTMLResponse(INDEX_HTML.read_text(encoding="utf-8"))
     return RedirectResponse("/api/v1/health")
+
+
+@app.get("/index.html", response_class=HTMLResponse, include_in_schema=False)
+async def serve_index():
+    if INDEX_HTML.exists():
+        return HTMLResponse(INDEX_HTML.read_text(encoding="utf-8"))
+    raise HTTPException(status_code=404, detail="index.html not found")
 
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["System"])
@@ -286,6 +303,26 @@ async def get_benchmark():
         )
     with open(bench_path) as f:
         return JSONResponse(content=json.load(f))
+
+
+@app.post("/api/challenge", tags=["Challenge"])
+@app.post("/challenge", include_in_schema=False)
+async def new_challenge(request: Request):
+    from src.challenge import ChallengeGenerator
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    mode = body.get("mode", "digits") if isinstance(body, dict) else "digits"
+    gen  = ChallengeGenerator()
+    ch   = gen.generate(mode=mode)
+    return {
+        "challenge_id": ch.challenge_id,
+        "phrase":       ch.phrase,
+        "digits":       ch.digits,
+        "expires_in_s": ch.expires_in_s,
+    }
 
 
 # ---------------------------------------------------------------------------
