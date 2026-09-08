@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "VoiceGuard — Real-Time Voice Clone Detection Prototype",
   "scripts": {
+    "build": "echo 'Static build ready'",
     "dev": "npx serve public",
     "start": "npx serve public"
   },

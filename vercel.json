@@ -1,12 +1,6 @@
 {
-  "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "functions": {
-    "api/*.js": {
-      "runtime": "@vercel/node"
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
@@ -38,19 +32,19 @@
   "rewrites": [
     {
       "source": "/challenge",
-      "destination": "/api/challenge.js"
+      "destination": "/api/challenge"
     },
     {
       "source": "/recent-logs",
-      "destination": "/api/recent-logs.js"
+      "destination": "/api/recent-logs"
     },
     {
       "source": "/health",
-      "destination": "/api/health.js"
+      "destination": "/api/health"
     },
     {
       "source": "/detect",
-      "destination": "/api/detect.js"
+      "destination": "/api/detect"
     }
   ]
 }
