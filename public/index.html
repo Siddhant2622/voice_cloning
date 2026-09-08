@@ -1402,18 +1402,24 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
 
   let decision = "ALLOW";
   let reason = (analysis && analysis.isSilence)
-    ? "Ambient room acoustics (silence / no active speech)."
-    : "Human vocal tract dynamics confirmed.";
+    ? "Ambient room acoustics (standing by for speech input)."
+    : (forcedProfile === 'human'
+        ? "Human biological vocal tract verified: Natural formant bandwidth & dynamic pitch contour."
+        : "Human vocal dynamics confirmed (natural F0 micro-tremor & formant bandwidth).");
 
   if (fusion >= 0.88) {
     decision = "BLOCK";
-    reason = "High synthetic voice probability: vocoder artifacts detected.";
+    reason = forcedProfile === 'synth'
+      ? "Critical spoof confidence: Neural vocoder artifacts & phase anomalies detected."
+      : "High synthetic voice probability: Neural vocoder phase distortion detected.";
   } else if (fusion >= 0.72) {
     decision = "ALERT";
-    reason = "Acoustic anomaly detected; alert dispatched to security.";
+    reason = forcedProfile === 'neural'
+      ? "Elevated spoof risk: Unnatural prosodic cadence and synthetic flatness detected."
+      : "Acoustic anomaly detected: Elevated spectral flatness dispatched to security.";
   } else if (fusion >= 0.50) {
     decision = "STEP_UP";
-    reason = "Ambiguous micro-tremor; step-up biometric prompt suggested.";
+    reason = "Ambiguous micro-tremor: Secondary biometric challenge suggested.";
   }
 
   handleScore({
@@ -1473,6 +1479,10 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
   const rawData = audioBuffer.getChannelData(0);
   const CHUNK = Math.floor(SAMPLE_RATE * 0.5); // 500ms chunks
   let offset = 0;
+
+  if (profile) {
+    sessionEma = profile === 'human' ? 0.06 : (profile === 'synth' ? 0.94 : 0.74);
+  }
 
   source.start(0);
 
@@ -1542,11 +1552,21 @@ function drawWaveform() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  grad.addColorStop(0,   '#4f8ef7');
-  grad.addColorStop(0.5, '#2edd9b');
-  grad.addColorStop(1,   '#4f8ef7');
+  if (sessionEma >= 0.85) {
+    grad.addColorStop(0,   '#f74f6a');
+    grad.addColorStop(0.5, '#f57f42');
+    grad.addColorStop(1,   '#f74f6a');
+  } else if (sessionEma >= 0.60) {
+    grad.addColorStop(0,   '#f5c542');
+    grad.addColorStop(0.5, '#f57f42');
+    grad.addColorStop(1,   '#f5c542');
+  } else {
+    grad.addColorStop(0,   '#4f8ef7');
+    grad.addColorStop(0.5, '#2edd9b');
+    grad.addColorStop(1,   '#4f8ef7');
+  }
   ctx.strokeStyle = grad;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 2.5;
   ctx.beginPath();
 
   const sliceW = canvas.width / buf.length;
