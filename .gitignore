@@ -67,4 +67,13 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+client_secrets.json
+gdrive_credentials.json
+settings.yaml
+
+# Datasets and caches
+data/large_dataset/
+data/enhanced_samples/
+data/*.pt
+data/gdrive_link.txt
 

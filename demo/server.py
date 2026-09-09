@@ -139,6 +139,9 @@ async def _startup():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
+    root_index = Path(__file__).parent.parent / "index.html"
+    if root_index.exists():
+        return HTMLResponse(root_index.read_text(encoding="utf-8"))
     index = STATIC_DIR / "index.html"
     if index.exists():
         return HTMLResponse(index.read_text(encoding="utf-8"))

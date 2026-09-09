@@ -1,0 +1,12 @@
+{
+  "val_acc": 100.0,
+  "val_loss": 0.0001,
+  "architecture": "DETECT-2B-lite",
+  "ssl_models": [
+    "wavlm-base",
+    "wav2vec2-base-960h"
+  ],
+  "mamba_enabled": false,
+  "data_dir": "data\\enhanced_samples",
+  "epochs": 100
+}

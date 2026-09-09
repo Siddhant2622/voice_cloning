@@ -70,7 +70,7 @@ def download_file(url: str, dest: Path) -> bool:
         print()  # newline after progress
         return True
     except Exception as exc:
-        print(f"\n  ✗ Download failed: {exc}")
+        print(f"\n  [FAIL] Download failed: {exc}")
         return False
 
 
@@ -85,10 +85,10 @@ def extract_archive(archive_path: Path, dest_dir: Path) -> bool:
             import zipfile
             with zipfile.ZipFile(archive_path) as zf:
                 zf.extractall(dest_dir)
-        print("  ✓ Extracted.")
+        print("  [OK] Extracted.")
         return True
     except Exception as exc:
-        print(f"  ✗ Extraction failed: {exc}")
+        print(f"  [FAIL] Extraction failed: {exc}")
         return False
 
 
@@ -150,13 +150,13 @@ def download_asvspoof_2019_la(partition: str = "eval") -> Path:
     if not extract_dir.exists() and archive_path.exists():
         extract_archive(archive_path, BASE_DIR)
 
-    print(f"\n✓ ASVspoof 2019 LA {partition} partition ready at: {BASE_DIR}")
+    print(f"\n[OK] ASVspoof 2019 LA {partition} partition ready at: {BASE_DIR}")
     return BASE_DIR
 
 
 def download_wavefake(dest: Path = None) -> Path:
     """
-    Download WaveFake dataset (no registration, ~50 GB full / 1 GB subset).
+    Download WaveFake dataset (no registration, subset ~2.4 GB).
     WaveFake: A Deep Fake Audio Detection Dataset
     https://github.com/RUB-SysSec/WaveFake
     """
@@ -164,18 +164,41 @@ def download_wavefake(dest: Path = None) -> Path:
         dest = Path(__file__).parent / "WaveFake"
     dest.mkdir(parents=True, exist_ok=True)
 
-    # WaveFake hosts a subset on Zenodo
-    zenodo_url = "https://zenodo.org/record/5642694/files/WaveFake.zip"
+    # WaveFake is hosted on Zenodo — record 5642694 (correct URL with follow-redirect)
+    # Direct file link (using requests/httpx for redirect support)
+    zenodo_url = "https://zenodo.org/records/5642694/files/WaveFake.zip?download=1"
     archive = dest / "WaveFake.zip"
 
-    print(f"\nWaveFake dataset → {dest}")
-    print("Source: https://zenodo.org/record/5642694 (CC BY 4.0)")
+    print(f"\nWaveFake dataset -> {dest}")
+    print("Source: https://zenodo.org/records/5642694 (CC BY 4.0)")
 
     if not archive.exists():
         print("Downloading WaveFake subset (~2.4 GB)...")
-        if not download_file(zenodo_url, archive):
-            print("Please download manually from: https://zenodo.org/record/5642694")
-            return dest
+        print(f"  URL: {zenodo_url}")
+        # Use httpx (supports redirects) or fall back to urllib
+        downloaded = False
+        try:
+            import httpx
+            with httpx.stream("GET", zenodo_url, follow_redirects=True, timeout=300) as r:
+                r.raise_for_status()
+                total = int(r.headers.get("content-length", 0))
+                done = 0
+                with open(archive, "wb") as f:
+                    for chunk in r.iter_bytes(chunk_size=1 << 20):
+                        f.write(chunk)
+                        done += len(chunk)
+                        if total:
+                            pct = done * 100 // total
+                            print(f"\r  {pct:3d}%  {done/1e6:.1f} / {total/1e6:.1f} MB", end="", flush=True)
+            print()
+            downloaded = True
+        except Exception as exc:
+            print(f"\n  [httpx failed: {exc}] Trying urllib...")
+        if not downloaded:
+            if not download_file(zenodo_url, archive):
+                print("  Please download manually from: https://zenodo.org/records/5642694")
+                print(f"  Place WaveFake.zip at: {archive}")
+                return dest
     else:
         print("  WaveFake.zip already downloaded.")
 

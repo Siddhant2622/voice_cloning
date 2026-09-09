@@ -46,3 +46,31 @@ slowapi>=0.1.9                  # SlowAPI rate limiter for FastAPI
 PyYAML>=6.0
 click>=8.1.0
 rich>=13.7.0
+
+# ============================================================
+# Resemble AI Inspired Training Stack
+# ============================================================
+
+# --- Resemble Enhance: AI speech denoiser for training data augmentation ---
+# Cleans bonafide samples → richer training distribution + 2x data
+# pip install resemble-enhance --upgrade
+resemble-enhance>=0.0.1
+
+# --- Multi-TTS synthetic data generators (for multi-generator training) ---
+# Training on diverse generators is the #1 factor for generalization
+# (inspired by Resemble AI training on 1000s of TTS systems)
+
+# Google TTS (neural, well-known voices)
+gTTS>=2.5.0
+
+# Microsoft Edge TTS (HiFi-GAN neural — hardest to detect, great hard negatives)
+edge-tts>=6.1.0
+
+# Coqui TTS — VITS neural vocoder (open-source high-quality TTS)
+# Generates some of the most realistic synthetic speech
+TTS>=0.22.0
+
+# --- Mamba-SSM (optional CUDA extension for faster temporal modeling) ---
+# Pure-PyTorch S4-lite fallback is included automatically if not installed
+# CUDA only: pip install mamba-ssm causal-conv1d
+# mamba-ssm>=1.2.0  # uncomment if CUDA available

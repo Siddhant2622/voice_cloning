@@ -287,7 +287,9 @@ async def analyze_file(
 
 
 def _score_waveform(wav) -> Dict:
-    """Run CM + liveness + fusion synchronously (called in executor)."""
+    """Run CM + liveness + fusion synchronously (called in executor).
+    Returns global + per-frame scores (Resemble AI DETECT-2B style).
+    """
     import numpy as np
     import torch
     from src.features import extract_all
@@ -298,8 +300,19 @@ def _score_waveform(wav) -> Dict:
     if not isinstance(wav, torch.Tensor):
         wav = torch.from_numpy(np.asarray(wav, dtype=np.float32))
 
-    feats = extract_all(wav, device=device)
+    # Extract all features (WavLM + Wav2Vec2 + log-mel)
+    feats = extract_all(wav, device=device, extract_wav2vec2=True)
+
+    # Global + frame-level CM scoring (DETECT-2B style)
     cm_score = _models["cm"].score(feats)
+    try:
+        global_score, frame_scores = _models["cm"].score_with_frames(feats)
+        # Identify frames with spoof probability > 0.6
+        suspicious_frames = [i for i, s in enumerate(frame_scores) if s > 0.6]
+    except Exception:
+        global_score = cm_score
+        frame_scores = []
+        suspicious_frames = []
 
     lv_result = {}
     liveness_score = None
@@ -321,12 +334,21 @@ def _score_waveform(wav) -> Dict:
     ctx = RiskContext(fusion_score=fs)
     decision = _models["risk"].decide(ctx)
 
+    # Downsample frame scores to max 50 for network efficiency
+    if len(frame_scores) > 50:
+        step = len(frame_scores) // 50
+        frame_scores_ds = [round(frame_scores[i], 3) for i in range(0, len(frame_scores), step)][:50]
+    else:
+        frame_scores_ds = [round(s, 3) for s in frame_scores]
+
     return {
-        "cm_score":       round(cm_score, 4),
-        "liveness_score": round(liveness_score, 4) if liveness_score is not None else 0.05,
-        "fusion_score":   round(fs, 4),
-        "decision":       decision.action.value,
-        "reason":         decision.reason,
+        "cm_score":         round(cm_score, 4),
+        "liveness_score":   round(liveness_score, 4) if liveness_score is not None else 0.05,
+        "fusion_score":     round(fs, 4),
+        "decision":         decision.action.value,
+        "reason":           decision.reason,
+        "frame_scores":     frame_scores_ds,
+        "suspicious_frames": suspicious_frames[:20],  # max 20 suspicious frame indices
     }
 
 
@@ -462,17 +484,19 @@ async def ws_stream(ws: WebSocket):
                     latency = (time.time() - t0) * 1000.0
 
                     await ws.send_json({
-                        "type":           "score",
-                        "timestamp":      datetime.now(timezone.utc).isoformat(),
-                        "window":         window,
-                        "window_index":   window,
-                        "fusion_score":   round(session_ema, 4),
-                        "cm_score":       scores["cm_score"],
-                        "liveness_score": scores["liveness_score"],
-                        "sv_score":       None,
-                        "decision":       scores["decision"],
-                        "reason":         scores.get("reason", ""),
-                        "latency_ms":     round(latency, 1),
+                        "type":              "score",
+                        "timestamp":         datetime.now(timezone.utc).isoformat(),
+                        "window":            window,
+                        "window_index":      window,
+                        "fusion_score":      round(session_ema, 4),
+                        "cm_score":          scores["cm_score"],
+                        "liveness_score":    scores["liveness_score"],
+                        "sv_score":          None,
+                        "decision":          scores["decision"],
+                        "reason":            scores.get("reason", ""),
+                        "latency_ms":        round(latency, 1),
+                        "frame_scores":      scores.get("frame_scores", []),
+                        "suspicious_frames": scores.get("suspicious_frames", []),
                     })
                 except Exception as exc:
                     logger.warning("Scoring error: %s", exc, exc_info=True)
