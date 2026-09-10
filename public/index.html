@@ -1335,7 +1335,7 @@ function analyzeAudioChunk(samples, sampleRate = 16000, adaptiveNoiseFloor = 0.0
   // Uses adaptive noise floor so mic idle (ambient) doesn't feed as distorted audio.
   // SNR < 1.5 relative to the measured noise floor = no usable speech signal.
   const snr = rms / (adaptiveNoiseFloor + 1e-6);
-  if (rms < 0.005 || snr < 1.5) {
+  if (rms < 0.008 || snr < 1.5) {
     return {
       rms, zcr: 0, hfRatio: 0, spectralCentroid: 0, spectralFlatness: 0,
       pitchPeriodicity: 0, energyVariance: 0, hnrProxy: 0, f0Jitter: 0,
@@ -1674,58 +1674,52 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
     // ── GUARD 1: Biological Vocal-Fold Jitter (strongest human signal) ──────
     // Human vocal cords produce natural micro-perturbations (jitter) in F0 period.
     // Synthetic engines have artificially rigid pitch (jitter < 1.8%).
-    if (voiced >= 4 && jitter >= 0.028) {
+    if (voiced >= 3 && jitter >= 0.024) {
       // Confirmed living biological vocal tract dynamics
       spoofScore = 0.04;
       reason = "Human biological vocal tract verified: Natural F0 micro-jitter & formant dynamics confirmed.";
-    } else if (voiced >= 2 && jitter >= 0.022 && flat >= 0.15) {
+    } else if (voiced >= 2 && jitter >= 0.018 && flat >= 0.12) {
       // Strong human formant + some jitter
       spoofScore = 0.06;
       reason = "Organic vocal resonance & formant structure confirmed.";
     } else {
       // ── DETECTION 1: Classical Robotic Vocoder (pyttsx3, eSpeak, Festival) ─
-      // Hallmarks: very rigid pitch (high corr, near-zero jitter), very low spectral
-      // flatness due to comb-filter harmonic notches, suppressed prosodic envelope.
-      if (pitch > 0.72 && flat < 0.10 && jitter < 0.020) {
-        spoofScore = Math.max(spoofScore, 0.90 + (pitch - 0.72) * 0.5);
+      if (pitch > 0.65 && flat < 0.12 && jitter < 0.022) {
+        spoofScore = Math.max(spoofScore, 0.90 + (pitch - 0.65) * 0.5);
         reason = "Critical: Robotic vocoder harmonics — rigid F0 with comb-filter spectral notches detected.";
-      } else if (flat < 0.09 && pitch > 0.65 && eVar < 0.85) {
+      } else if (flat < 0.11 && pitch > 0.60 && eVar < 0.90) {
         spoofScore = Math.max(spoofScore, 0.85);
         reason = "High spoof confidence: Unnatural spectral flatness & pitch rigidity (classical vocoder).";
       }
 
       // ── DETECTION 2: Modern Neural Vocoder (HiFi-GAN, ElevenLabs, VITS) ───
-      // Hallmarks: elevated ZCR (phase noise floor from upsampling), suppressed
-      // prosodic dynamics (eVar < 0.85), high pitch periodicity.
-      if (zcr >= 0.140 && eVar < 0.88 && pitch > 0.45 && jitter < 0.025) {
-        const zcrExcess = (zcr - 0.140) * 5.0;
-        spoofScore = Math.max(spoofScore, 0.80 + zcrExcess);
+      // Relaxed thresholds to catch more AI voices
+      if (zcr >= 0.120 && eVar < 0.95 && pitch > 0.35 && jitter < 0.035) {
+        const zcrExcess = (zcr - 0.120) * 5.0;
+        spoofScore = Math.max(spoofScore, 0.75 + zcrExcess);
         reason = "Elevated spoof risk: Neural vocoder phase noise & suppressed prosodic dynamics.";
-      } else if (zcr >= 0.135 && hf >= 0.040 && eVar < 0.92) {
-        spoofScore = Math.max(spoofScore, 0.75);
+      } else if (zcr >= 0.125 && hf >= 0.030 && eVar < 1.0) {
+        spoofScore = Math.max(spoofScore, 0.70);
         reason = "Acoustic anomaly: Elevated high-frequency phase noise & spectral flatness.";
       }
 
       // ── SAFEGUARD: Human Sibilants & Fricatives (/s/, /sh/, /t/, /f/) ──────
-      // High ZCR is normal for unvoiced consonants — but they come with low pitch
-      // periodicity (no harmonic structure) and healthy energy variance.
-      if (zcr >= 0.125 && pitch < 0.35 && eVar >= 0.80) {
+      if (zcr >= 0.110 && pitch < 0.40 && eVar >= 0.75) {
         spoofScore = Math.min(spoofScore, 0.10);
         reason = "Unvoiced fricative / sibilant detected — consistent with natural human speech.";
       }
 
       // ── SAFEGUARD: Clean Human Formant Envelope ─────────────────────────────
-      // Low-frequency, natural formant resonance: healthy flatness, low HF, moderate pitch
-      if (zcr < 0.125 && hf < 0.035 && flat >= 0.14 && cent < 0.24) {
+      if (zcr < 0.135 && hf < 0.045 && flat >= 0.12 && cent < 0.28) {
         spoofScore = Math.min(spoofScore, 0.08);
         reason = "Human formant structure confirmed: Natural resonance & spectral envelope.";
       }
 
       // ── SAFEGUARD: Dynamic Prosodic Energy (syllabic inflection) ────────────
-      if (eVar >= 1.05) {
-        spoofScore *= 0.12; // 88% discount — natural prosodic variability
+      if (eVar >= 0.95) {
+        spoofScore *= 0.12; 
         if (spoofScore < 0.12) reason = "Human prosodic dynamics confirmed: Natural syllabic energy contour.";
-      } else if (eVar >= 0.90 && pitch <= 0.62 && flat >= 0.14) {
+      } else if (eVar >= 0.85 && pitch <= 0.65 && flat >= 0.12) {
         spoofScore *= 0.25;
         if (spoofScore < 0.15) reason = "Human vocal envelope: Moderate energy variance & natural formant resonance.";
       }
