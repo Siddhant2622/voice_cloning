@@ -88,21 +88,43 @@ be more robust than two WavLM heads).
 
 ---
 
-## 5. Replay Attacks via Injection
+## 5. The Presentation Gap: Replay and Room Acoustic Degradation
 
-A replay attack (playing a pre-recorded genuine clip through a virtual audio
-cable or audio injection tool) has a different artifact profile from TTS:
-- May have near-zero F0 jitter variation (recorded from a single session).
-- May show room-acoustic fingerprints inconsistent with the current call environment.
-- Will not respond correctly to an active challenge (digit string).
+**The Presentation Gap is the primary cause of live voice clone false-negatives.**
 
-**This prototype's replay detection:** partial. The liveness heuristic checks
-F0 jitter (low jitter = suspicious), which helps. The active challenge-response
-(Layer 4c) defeats pre-recorded clips outright — but it's only a stub here.
+When an anti-spoofing model (such as WavLM or Wav2Vec2) is trained solely on direct digital or clean studio audio, it learns representations sensitive to phase artifacts, high-frequency vocoder spectra, and pristine glottal pulses. In live testing or attack scenarios, synthetic speech is transmitted across a physical acoustic air path (e.g. played through a loudspeaker or smartphone and picked up by a laptop microphone).
+
+### The Physical Failure Mechanism:
+1. **Loudspeaker Frequency Shaping & Distortion:**
+   - Physical transducers have steep high-pass bass rolloff (<140 Hz), resonant peak colorations (2.5–4.0 kHz), and driver harmonic distortion.
+   - Non-linear compression masks the micro-level synthetic vocoder artifacts that the CM classifier relies on.
+2. **Room Impulse Response (RIR) & Reverberation:**
+   - Multi-path reflections ($RT_{60} \approx 0.20$ to $0.55$s) smear phoneme boundaries and blend vocoder phase discrepancies into diffuse room energy.
+3. **Microphone Coloration & Ambient Room Noise:**
+   - MEMS / Electret microphone frequency response curves, directional polar characteristics, and ambient background noise (HVAC, fans, thermal hiss at SNR 20–30 dB) degrade high-frequency signals (>7.5 kHz).
+4. **The False-Bonafide Trap:**
+   - Because genuine human speech spoken into a live microphone also exhibits room reverberation and mic coloration, a classifier unaccustomed to degraded synthetic audio misattributes this room coloration as "human acoustic naturalness," erroneously classifying the replayed spoof as bonafide.
+
+### Implemented Mitigation:
+- **Hybrid Replay Augmentation Pipeline (`data/replay_augment.py`):**
+  - **Physical Replay:** Samples are played through physical loudspeakers and re-recorded via the microphone array in real time to capture true hardware transducer non-linearities.
+  - **Acoustic Simulation:** Samples are convolved with multi-room impulse responses, speaker soft-clipping saturation, mic transfer curves, and room ambient noise profiles.
+  - **Balanced Mixed Retraining:** The CM classifier (`cm_detect2b_v2.pt`) and Fusion model are retrained on a configurable mixture (e.g. 50% clean spoof, 50% replayed spoof vs bonafide speech), teaching the SSL backbone invariant spoof cues across both pristine and degraded acoustic channels.
+- **Direct Buffer "Stream File" Mode:**
+  - Added a dedicated direct stream path in the UI that feeds pristine audio buffers directly into the analyzer worklet/WebSocket, bypassing physical mic and speaker degradation to enable fair, uncolored side-by-side comparison against live voice.
 
 ---
 
-## 6. Live Real-Time Voice Conversion
+## 6. Replay Attacks via Pre-Recorded Audio Injection
+
+A replay attack (playing a pre-recorded genuine human clip through a virtual audio cable or speaker) differs from speech synthesis:
+- Natural biological vocal tract characteristics are present in the recording.
+- Liveness heuristics check F0 pitch jitter and dynamic spectral variance (low variance across repeating sessions indicates a pre-recorded loop).
+- The active challenge-response step (random verification digits) guarantees temporal freshness and defeats static replay loops.
+
+---
+
+## 7. Live Real-Time Voice Conversion
 
 The hardest attack case. The attacker speaks live; a voice-conversion model
 reshapes their voice to the target's in ~200–400ms. As of 2025–2026, state-of-
@@ -123,7 +145,7 @@ fine-tuning on conversion examples.
 
 ---
 
-## 7. Speaker Enrollment Quality
+## 8. Speaker Enrollment Quality
 
 The SASV pillar (Layer 4b) only activates when a reference voiceprint is
 enrolled. In IVR systems, enrollment quality varies:
@@ -136,7 +158,7 @@ In this prototype there is no minimum enrollment quality check.
 
 ---
 
-## 8. Small Training Set in Prototype Mode
+## 9. Small Training Set in Prototype Mode
 
 When trained on the demo `data/samples/` directory (pyttsx3 + fallback clips),
 the CM classifier has at most ~10 examples of each class. Logistic fusion has
@@ -152,6 +174,7 @@ correct verification path.
 
 | Risk | Severity | Current mitigation |
 |---|---|---|
+| Presentation Gap (Speaker/Room Air Path) | **Critical** | Physical replay + RIR simulation pipeline (`replay_augment.py`) + Stream File Mode |
 | Unseen synthesis methods | **Critical** | SSL backbone (partial); retrain pipeline |
 | Cross-lingual audio | **High** | None in prototype |
 | Codec compression (G.711/AMR) | **High** | None in prototype |
@@ -160,3 +183,4 @@ correct verification path.
 | Live voice conversion | **High** | Unknown; untested |
 | Enrollment quality | **Medium** | None in prototype |
 | Small training set | **High** | Use ASVspoof 2019 for real eval |
+

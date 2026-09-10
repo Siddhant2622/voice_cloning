@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--no-sv",      action="store_true",     help="Disable speaker verification pillar.")
     parser.add_argument("--no-liveness",action="store_true",     help="Disable liveness pillar.")
     parser.add_argument("--enroll-dir", default=None,            help="Directory of reference enrollment audio files (speaker_id.wav).")
+    parser.add_argument("--limit",      type=int, default=None, help="Limit number of samples for faster calibration.")
     args = parser.parse_args()
 
     import torch
@@ -52,12 +53,26 @@ def main():
     samples = []
     meta_csv = data_dir / "samples_metadata.csv"
     if meta_csv.exists():
+        bf_samples, sp_clean, sp_replayed = [], [], []
         with open(meta_csv, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                label = 1 if row["label"] == "spoof" else 0
-                ap    = data_dir / row["file"]
-                if ap.exists():
-                    samples.append((ap, label))
+                ap = data_dir / row["file"]
+                if not ap.exists():
+                    continue
+                if row["label"] == "bonafide":
+                    bf_samples.append((ap, 0))
+                elif "replayed" in row.get("source", "") or "replayed" in row["file"]:
+                    sp_replayed.append((ap, 1))
+                else:
+                    sp_clean.append((ap, 1))
+
+        if args.limit:
+            half = args.limit // 2
+            replayed_count = half // 2
+            clean_count = half - replayed_count
+            samples = bf_samples[:half] + sp_clean[:clean_count] + sp_replayed[:replayed_count]
+        else:
+            samples = bf_samples + sp_clean + sp_replayed
     else:
         for subdir, label in [("bonafide", 0), ("spoof", 1)]:
             d = data_dir / subdir
@@ -66,8 +81,10 @@ def main():
             for f in sorted(d.glob("*")):
                 if f.suffix.lower() in {".wav", ".flac", ".mp3", ".ogg"}:
                     samples.append((f, label))
+        if args.limit:
+            samples = samples[:args.limit]
 
-    logger.info("Loaded %d labeled samples.", len(samples))
+    logger.info("Loaded %d labeled samples for fusion training.", len(samples))
 
     # ── Initialize scorers ──────────────────────────────────────────────────
     cm_scorer   = CMScorerWrapper(checkpoint_path=args.cm_model, device=device)

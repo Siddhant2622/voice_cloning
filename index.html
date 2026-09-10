@@ -718,16 +718,21 @@
     <div class="panel col-full">
       <div class="panel-title">
         <span>Live Audio Input & Waveform</span>
-        <span id="input-status" style="font-size: 11px; color: var(--text-muted);">Ready</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span id="stream-mode-badge" style="display: none; padding: 3px 9px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.03em;"></span>
+          <span id="input-status" style="font-size: 11px; color: var(--text-muted);">Ready</span>
+        </div>
       </div>
 
       <div class="controls">
         <button class="btn btn-primary" id="btn-mic">🎙️ Start Mic</button>
+        <button class="btn btn-accent" id="btn-stream-file" style="background: linear-gradient(135deg, #4f8ef7, #2edd9b); color: #080c14; font-weight: 600;">⚡ Stream File (Bypass Mic)</button>
         <button class="btn btn-secondary" id="btn-file">📁 Upload Audio File</button>
         <button class="btn btn-danger" id="btn-stop" disabled>⏹ Stop</button>
         <button class="btn btn-secondary" id="btn-challenge">🎲 Generate Challenge</button>
         <button class="btn btn-secondary" id="btn-reset">↺ Reset Session</button>
         <input type="file" id="file-input" accept="audio/*" style="display:none" />
+        <input type="file" id="stream-file-input" accept="audio/*" style="display:none" />
       </div>
 
       <canvas id="waveform" width="1080" height="90"></canvas>
@@ -1206,11 +1211,14 @@ const decisionBadge  = document.getElementById('decision-badge');
 const decisionText   = document.getElementById('decision-text');
 const decisionReason = document.getElementById('decision-reason');
 const btnMic         = document.getElementById('btn-mic');
+const btnStreamFile  = document.getElementById('btn-stream-file');
 const btnFile        = document.getElementById('btn-file');
 const btnStop        = document.getElementById('btn-stop');
 const btnChallenge   = document.getElementById('btn-challenge');
 const btnReset       = document.getElementById('btn-reset');
 const fileInput      = document.getElementById('file-input');
+const streamFileInput= document.getElementById('stream-file-input');
+const streamModeBadge= document.getElementById('stream-mode-badge');
 const challengeBox   = document.getElementById('challenge-box');
 const challengePhrase= document.getElementById('challenge-phrase');
 const challengeExpires = document.getElementById('challenge-expires');
@@ -1851,9 +1859,19 @@ async function startMic() {
     };
   }
 
-  btnMic.disabled  = true;
-  btnFile.disabled = true;
-  btnStop.disabled = false;
+  btnMic.disabled        = true;
+  if (btnStreamFile) btnStreamFile.disabled = true;
+  btnFile.disabled       = true;
+  btnStop.disabled       = false;
+
+  if (streamModeBadge) {
+    streamModeBadge.style.display = 'inline-block';
+    streamModeBadge.textContent = '🎙️ Live Microphone (Acoustic Air Path)';
+    streamModeBadge.style.background = 'rgba(79, 142, 247, 0.15)';
+    streamModeBadge.style.color = 'var(--accent)';
+    streamModeBadge.style.border = '1px solid var(--border-bright)';
+  }
+
   drawWaveform();
 }
 
@@ -2043,15 +2061,17 @@ function stopStream() {
   if (audioCtx)    { audioCtx.close().catch(()=>{}); audioCtx = null; }
   analyser = null;
 
-  btnMic.disabled  = false;
-  btnFile.disabled = false;
-  btnStop.disabled = true;
+  btnMic.disabled        = false;
+  if (btnStreamFile) btnStreamFile.disabled = false;
+  btnFile.disabled       = false;
+  btnStop.disabled       = true;
+  if (streamModeBadge) streamModeBadge.style.display = 'none';
   inputStatus.textContent = 'Ready';
   wfCtx.clearRect(0, 0, wfCanvas.width, wfCanvas.height);
 }
 
-/* ─── Audio File Streaming & Sample Testing ─────────────────────────────── */
-async function playAndAnalyzeAudio(audioBuffer, profile = null) {
+/* ─── Audio File Streaming & Direct Buffer Testing ──────────────────────── */
+async function playAndAnalyzeAudio(audioBuffer, profile = null, options = {}) {
   stopStream();
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -2062,13 +2082,38 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
   const source = audioCtx.createBufferSource();
   source.buffer = audioBuffer;
   source.connect(analyser);
-  analyser.connect(audioCtx.destination);
+
+  if (options.muteSpeakers) {
+    const muteGain = audioCtx.createGain();
+    muteGain.gain.value = 0.0;
+    analyser.connect(muteGain);
+    muteGain.connect(audioCtx.destination);
+  } else {
+    analyser.connect(audioCtx.destination);
+  }
   currentAudioSource = source;
 
-  btnMic.disabled  = true;
-  btnFile.disabled = true;
-  btnStop.disabled = false;
-  inputStatus.textContent = 'Analyzing Audio Stream...';
+  btnMic.disabled        = true;
+  if (btnStreamFile) btnStreamFile.disabled = true;
+  btnFile.disabled       = true;
+  btnStop.disabled       = false;
+
+  if (streamModeBadge) {
+    streamModeBadge.style.display = 'inline-block';
+    if (options.bypassMic) {
+      streamModeBadge.textContent = '⚡ Stream File (Direct Buffer — Mic Bypassed)';
+      streamModeBadge.style.background = 'rgba(46, 221, 155, 0.18)';
+      streamModeBadge.style.color = 'var(--green)';
+      streamModeBadge.style.border = '1px solid rgba(46, 221, 155, 0.4)';
+      inputStatus.textContent = 'Streaming Direct Digital Audio Buffer (Mic Bypassed)...';
+    } else {
+      streamModeBadge.textContent = '📁 Uploaded File Stream';
+      streamModeBadge.style.background = 'rgba(79, 142, 247, 0.15)';
+      streamModeBadge.style.color = 'var(--accent)';
+      streamModeBadge.style.border = '1px solid var(--border-bright)';
+      inputStatus.textContent = 'Analyzing Audio Stream...';
+    }
+  }
 
   drawWaveform();
 
@@ -2084,8 +2129,10 @@ async function playAndAnalyzeAudio(audioBuffer, profile = null) {
       clearInterval(interval);
       setTimeout(() => {
         btnMic.disabled = false;
+        if (btnStreamFile) btnStreamFile.disabled = false;
         btnFile.disabled = false;
         btnStop.disabled = true;
+        if (streamModeBadge) streamModeBadge.style.display = 'none';
         inputStatus.textContent = 'Analysis Completed';
       }, 500);
       return;
@@ -2301,6 +2348,18 @@ btnReset.onclick     = () => {
   });
 };
 
+btnStreamFile.onclick = () => streamFileInput.click();
+streamFileInput.onchange = async (e) => {
+  if (e.target.files[0]) {
+    const file = e.target.files[0];
+    const arrayBuf = await file.arrayBuffer();
+    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await tempCtx.decodeAudioData(arrayBuf);
+    tempCtx.close();
+    playAndAnalyzeAudio(decoded, null, { bypassMic: true, muteSpeakers: false });
+  }
+};
+
 btnFile.onclick = () => fileInput.click();
 fileInput.onchange = async (e) => {
   if (e.target.files[0]) {
@@ -2309,7 +2368,7 @@ fileInput.onchange = async (e) => {
     const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
     const decoded = await tempCtx.decodeAudioData(arrayBuf);
     tempCtx.close();
-    playAndAnalyzeAudio(decoded);
+    playAndAnalyzeAudio(decoded, null, { bypassMic: false, muteSpeakers: false });
   }
 };
 

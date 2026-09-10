@@ -55,17 +55,30 @@ def load_and_trim(path: Path) -> torch.Tensor:
     return wav_16k
 
 
-def build_or_load_dataset(device="cpu"):
-    if CACHE_FILE.exists():
-        logger.info("Loading cached features from %s...", CACHE_FILE)
-        data = torch.load(str(CACHE_FILE), weights_only=False)
+def build_or_load_dataset(device="cpu", replay_ratio: float = 0.5, force_rebuild: bool = False):
+    cache_path = Path(f"data/balanced_features_cache_replay{int(replay_ratio * 100)}.pt")
+    if cache_path.exists() and not force_rebuild:
+        logger.info("Loading cached features from %s...", cache_path)
+        data = torch.load(str(cache_path), weights_only=False)
         return data["logmel"], data["ssl"], data["w2v2"], data["labels"]
 
-    logger.info("Building balanced feature dataset...")
+    logger.info("Building replay-augmented feature dataset (replay_ratio=%.2f)...", replay_ratio)
     bf_files = sorted(list(Path("data/large_dataset/bonafide").glob("*.flac")) + list(Path("data/large_dataset/bonafide").glob("*.wav")))[:162]
-    sp_files = sorted(list(Path("data/large_dataset/spoof").glob("*.wav")) + list(Path("data/large_dataset/spoof").glob("*.mp3")))[:162]
+    
+    clean_sp_files = sorted(list(Path("data/large_dataset/spoof").glob("*.wav")) + list(Path("data/large_dataset/spoof").glob("*.mp3")))
+    replayed_sp_files = sorted(list(Path("data/large_dataset/replayed_spoof").glob("*.wav")))
+    
+    if len(replayed_sp_files) == 0:
+        logger.warning("No replayed_spoof samples found! Run data/replay_augment.py first. Falling back to clean spoof.")
+        sp_files = clean_sp_files[:len(bf_files)]
+    else:
+        total_sp = len(bf_files)  # 162
+        num_replayed = int(round(total_sp * replay_ratio))
+        num_clean = total_sp - num_replayed
+        sp_files = clean_sp_files[:num_clean] + replayed_sp_files[:num_replayed]
+        logger.info("Spoof composition: %d clean + %d replayed (ratio=%.2f)", num_clean, num_replayed, replay_ratio)
 
-    logger.info("Bonafide files: %d | Spoof files: %d", len(bf_files), len(sp_files))
+    logger.info("Bonafide files: %d | Total Spoof files: %d", len(bf_files), len(sp_files))
     all_files = [(f, 0) for f in bf_files] + [(f, 1) for f in sp_files]
     random.seed(42)
     random.shuffle(all_files)
@@ -111,16 +124,16 @@ def build_or_load_dataset(device="cpu"):
     X_w2v2   = torch.stack(w2v2s).float()
     y        = torch.tensor(labels, dtype=torch.float32)
 
-    logger.info("Saving features cache to %s...", CACHE_FILE)
-    torch.save({"logmel": X_logmel, "ssl": X_ssl, "w2v2": X_w2v2, "labels": y}, str(CACHE_FILE))
+    logger.info("Saving features cache to %s...", cache_path)
+    torch.save({"logmel": X_logmel, "ssl": X_ssl, "w2v2": X_w2v2, "labels": y}, str(cache_path))
     return X_logmel, X_ssl, X_w2v2, y
 
 
-def train():
+def train(replay_ratio: float = 0.5, force_rebuild: bool = False, epochs: int = 80):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info("Using device: %s", device)
+    logger.info("Using device: %s | Replay Ratio: %.2f", device, replay_ratio)
 
-    X_logmel, X_ssl, X_w2v2, y = build_or_load_dataset(device=device)
+    X_logmel, X_ssl, X_w2v2, y = build_or_load_dataset(device=device, replay_ratio=replay_ratio, force_rebuild=force_rebuild)
     logger.info("Dataset shape: logmel=%s, ssl=%s, w2v2=%s, y=%s",
                 X_logmel.shape, X_ssl.shape, X_w2v2.shape, y.shape)
 
@@ -135,14 +148,13 @@ def train():
 
     model = build_cm_classifier(use_mamba=False).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=80, eta_min=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
     bce = nn.BCEWithLogitsLoss()
 
     best_val_loss = float("inf")
     best_val_acc = 0.0
     best_state = None
 
-    epochs = 80
     logger.info("Training for %d epochs...", epochs)
 
     for epoch in range(1, epochs + 1):
@@ -231,10 +243,12 @@ def train():
     meta = {
         "val_acc": round(best_val_acc * 100, 2),
         "val_loss": round(best_val_loss, 4),
-        "architecture": "DETECT-2B-lite",
+        "architecture": "DETECT-2B-lite (Presentation-Gap Hardened)",
         "ssl_models": ["wavlm-base", "wav2vec2-base-960h"],
         "mamba_enabled": False,
-        "data_dir": "data/large_dataset (balanced 162 BF + 162 SP)",
+        "replay_ratio": replay_ratio,
+        "presentation_gap_mitigation": "hybrid_replay_augmentation",
+        "data_dir": f"data/large_dataset (balanced 162 BF + 162 SP [ratio={replay_ratio}])",
         "epochs": epochs
     }
     with open(MODEL_OUT.with_suffix(".json"), "w") as fp:
@@ -244,8 +258,16 @@ def train():
     print("TRAINING SUCCESSFUL!")
     print(f"Model saved: {MODEL_OUT}")
     print(f"Val Accuracy: {best_val_acc * 100:.1f}%")
+    print(f"Replay Ratio: {replay_ratio * 100:.0f}%")
     print("="*50 + "\n")
 
 
 if __name__ == "__main__":
-    train()
+    import argparse
+    parser = argparse.ArgumentParser(description="Train balanced DETECT-2B classifier with replay augmentation")
+    parser.add_argument("--replay-ratio", type=float, default=0.5, help="Ratio of replayed spoof samples (0.0 to 1.0)")
+    parser.add_argument("--force-rebuild", action="store_true", help="Force rebuilding feature cache")
+    parser.add_argument("--epochs", type=int, default=80, help="Number of training epochs")
+    args = parser.parse_args()
+
+    train(replay_ratio=args.replay_ratio, force_rebuild=args.force_rebuild, epochs=args.epochs)

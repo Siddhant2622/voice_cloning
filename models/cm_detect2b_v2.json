@@ -1,12 +1,14 @@
 {
   "val_acc": 100.0,
-  "val_loss": 0.0,
-  "architecture": "DETECT-2B-lite",
+  "val_loss": 0.0001,
+  "architecture": "DETECT-2B-lite (Presentation-Gap Hardened)",
   "ssl_models": [
     "wavlm-base",
     "wav2vec2-base-960h"
   ],
   "mamba_enabled": false,
-  "data_dir": "data/large_dataset (balanced 162 BF + 162 SP)",
+  "replay_ratio": 0.5,
+  "presentation_gap_mitigation": "hybrid_replay_augmentation",
+  "data_dir": "data/large_dataset (balanced 162 BF + 162 SP [ratio=0.5])",
   "epochs": 80
 }

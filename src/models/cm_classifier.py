@@ -378,24 +378,42 @@ class CMScorerWrapper:
         self,
         checkpoint_path: Optional[str | Path] = None,
         device:          Optional[str]         = None,
-        use_mamba:       bool                  = True,
+        use_mamba:       Optional[bool]        = None,
     ):
         import torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = build_cm_classifier(use_mamba=use_mamba).to(self.device)
-        self.model.eval()
 
         if checkpoint_path and Path(checkpoint_path).exists():
-            state = torch.load(str(checkpoint_path), map_location=self.device, weights_only=True)
+            cp = Path(checkpoint_path)
+            meta_file = cp.with_suffix(".json")
+            detected_mamba = False
+            if meta_file.exists():
+                try:
+                    with open(meta_file, "r") as fp:
+                        meta = json.load(fp)
+                        detected_mamba = meta.get("mamba_enabled", False)
+                except Exception:
+                    pass
+
+            state = torch.load(str(cp), map_location=self.device, weights_only=True)
+            # Check state dict keys
+            if any(k.startswith("mamba.") for k in state.keys()):
+                detected_mamba = True
+
+            actual_mamba = detected_mamba if use_mamba is None else use_mamba
+            self.model = build_cm_classifier(use_mamba=actual_mamba).to(self.device)
             self.model.load_state_dict(state, strict=False)
-            logger.info("CM v2 checkpoint loaded: %s", checkpoint_path)
+            logger.info("CM v2 checkpoint loaded: %s (mamba_enabled=%s)", checkpoint_path, actual_mamba)
         else:
+            actual_mamba = True if use_mamba is None else use_mamba
+            self.model = build_cm_classifier(use_mamba=actual_mamba).to(self.device)
             if checkpoint_path:
                 logger.warning(
                     "CM checkpoint not found at %s; using random weights. "
                     "Run training/train_cm.py to train the model.",
                     checkpoint_path,
                 )
+        self.model.eval()
 
     def score(self, features: Dict[str, "torch.Tensor"]) -> float:
         """
