@@ -2002,11 +2002,11 @@ function evaluateEdgeRisk(analysis) {
 
   // Decision Thresholds
   let decision = 'ALLOW';
-  if (sessionEma >= 0.70 && consecutiveAiWindows >= 2) {
+  if ((sessionEma >= 0.62 && consecutiveAiWindows >= 2) || sessionEma >= 0.78) {
     decision = 'BLOCK';
-  } else if (sessionEma >= 0.50) {
+  } else if (sessionEma >= 0.48) {
     decision = 'ALERT';
-  } else if (sessionEma >= 0.35) {
+  } else if (sessionEma >= 0.32) {
     decision = 'STEP_UP';
   }
 
