@@ -77,3 +77,5 @@ data/enhanced_samples/
 data/*.pt
 data/gdrive_link.txt
 
+
+.vercel

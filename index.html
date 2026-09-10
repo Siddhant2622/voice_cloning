@@ -1335,7 +1335,7 @@ function analyzeAudioChunk(samples, sampleRate = 16000, adaptiveNoiseFloor = 0.0
   // Uses adaptive noise floor so mic idle (ambient) doesn't feed as distorted audio.
   // SNR < 1.5 relative to the measured noise floor = no usable speech signal.
   const snr = rms / (adaptiveNoiseFloor + 1e-6);
-  if (rms < 0.010 || snr < 1.5) {
+  if (rms < 0.005 || snr < 1.5) {
     return {
       rms, zcr: 0, hfRatio: 0, spectralCentroid: 0, spectralFlatness: 0,
       pitchPeriodicity: 0, energyVariance: 0, hnrProxy: 0, f0Jitter: 0,
@@ -1368,6 +1368,24 @@ function analyzeAudioChunk(samples, sampleRate = 16000, adaptiveNoiseFloor = 0.0
   const centroidList = [];
   const flatnessList = [];
 
+  // Lazy initialize DFT tables for huge performance boost
+  if (!window._dftCosTable) {
+    window._dftCosTable = new Float32Array((fftN / 2) * fftN);
+    window._dftSinTable = new Float32Array((fftN / 2) * fftN);
+    window._dftWindow = new Float32Array(fftN);
+    for (let n = 0; n < fftN; n++) {
+      window._dftWindow[n] = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (fftN - 1)));
+    }
+    for (let k = 1; k < fftN / 2; k++) {
+      const kOffset = k * fftN;
+      for (let n = 0; n < fftN; n++) {
+        const angle = (-2 * Math.PI * k * n) / fftN;
+        window._dftCosTable[kOffset + n] = Math.cos(angle);
+        window._dftSinTable[kOffset + n] = Math.sin(angle);
+      }
+    }
+  }
+
   for (let f = 0; f < nFrames && f < 24; f++) {
     const start = f * spectralHop;
     const mags = new Float32Array(fftN / 2);
@@ -1376,12 +1394,11 @@ function analyzeAudioChunk(samples, sampleRate = 16000, adaptiveNoiseFloor = 0.0
     // Compute DFT magnitude spectrum with Hann window
     for (let k = 1; k < fftN / 2; k++) {
       let re = 0, im = 0;
+      const kOffset = k * fftN;
       for (let n = 0; n < fftN; n++) {
-        const w = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (fftN - 1)));
-        const s = (start + n < len) ? samples[start + n] * w : 0;
-        const angle = (-2 * Math.PI * k * n) / fftN;
-        re += s * Math.cos(angle);
-        im += s * Math.sin(angle);
+        const s = (start + n < len) ? samples[start + n] * window._dftWindow[n] : 0;
+        re += s * window._dftCosTable[kOffset + n];
+        im += s * window._dftSinTable[kOffset + n];
       }
       const mag = Math.sqrt(re * re + im * im) + 1e-10;
       mags[k] = mag;
