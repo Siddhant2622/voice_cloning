@@ -2251,7 +2251,6 @@ async function loadSampleUrl(url, profile) {
 
 /* ─── Google Drive Streaming & Playback ──────────────────────────────────── */
 async function loadDriveSample(fileId, profile, title) {
-  if (isAnalyzing) stopMic();
   inputStatus.innerHTML = `<span style="color:var(--accent)">☁️ Fetching ${title} from Google Drive...</span>`;
 
   let arrayBuf = null;
@@ -2298,7 +2297,7 @@ async function loadDriveSample(fileId, profile, title) {
     const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
     const decoded = await tempCtx.decodeAudioData(arrayBuf);
     tempCtx.close();
-    playAndAnalyzeAudio(decoded, profile);
+    playAndAnalyzeAudio(decoded, profile, { bypassMic: true });
   } catch (err) {
     alert(`Error decoding audio from Google Drive: ${err.message}`);
     inputStatus.textContent = 'Ready';
