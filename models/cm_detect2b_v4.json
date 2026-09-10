@@ -1,0 +1,26 @@
+{
+  "version": "v3.1-asvspoof2017",
+  "val_acc": 100.0,
+  "eer_percent": 0.0,
+  "architecture": "DETECT-2B-lite (Hardened with ASVspoof 2017 V2 Physical Replay & Mic Data)",
+  "ssl_models": [
+    "wavlm-base",
+    "wav2vec2-base-960h"
+  ],
+  "mamba_enabled": false,
+  "codec_augmentation": true,
+  "replay_augmentation": true,
+  "asvspoof2017_enabled": true,
+  "data_dir": "data/modern_dataset",
+  "asvspoof2017_dir": "data/asvspoof2017",
+  "max_samples_per_class": 500,
+  "epochs": 70,
+  "training_datasets": [
+    "librispeech",
+    "mlaad",
+    "in-the-wild",
+    "wavefake",
+    "asvspoof2017_v2"
+  ],
+  "presentation_gap_mitigation": "ASVspoof 2017 V2 Physical Microphones (R01-R25) + Codec Aug + Replay Aug"
+}
