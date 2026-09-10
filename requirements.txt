@@ -17,7 +17,7 @@ onnxruntime>=1.18.0            # CPU fallback; use onnxruntime-gpu on GPU
 
 # --- Scientific stack ---
 numpy>=1.24.0
-scipy>=1.12.0
+scipy>=1.11.4
 scikit-learn>=1.4.0
 pandas>=2.0.0
 tqdm>=4.66.0
@@ -51,10 +51,12 @@ rich>=13.7.0
 # Resemble AI Inspired Training Stack
 # ============================================================
 
-# --- Resemble Enhance: AI speech denoiser for training data augmentation ---
-# Cleans bonafide samples → richer training distribution + 2x data
-# pip install resemble-enhance --upgrade
-resemble-enhance>=0.0.1
+# --- Resemble Enhance: AI speech denoiser (training only) ---
+# NOTE: resemble-enhance 0.0.1 requires scipy==1.11.4 (strict pin).
+# Install this group SEPARATELY from the main requirements to avoid conflicts:
+#   pip install resemble-enhance==0.0.1 "scipy==1.11.4"
+# It is NOT needed for the web server or test suite — only for offline training.
+# resemble-enhance>=0.0.1
 
 # --- Multi-TTS synthetic data generators (for multi-generator training) ---
 # Training on diverse generators is the #1 factor for generalization
@@ -66,9 +68,9 @@ gTTS>=2.5.0
 # Microsoft Edge TTS (HiFi-GAN neural — hardest to detect, great hard negatives)
 edge-tts>=6.1.0
 
-# Coqui TTS — VITS neural vocoder (open-source high-quality TTS)
-# Generates some of the most realistic synthetic speech
-TTS>=0.22.0
+# Coqui TTS — VITS neural vocoder (optional offline training generator)
+# Install separately if generating Coqui synthetic data: pip install TTS
+# TTS>=0.22.0
 
 # --- Mamba-SSM (optional CUDA extension for faster temporal modeling) ---
 # Pure-PyTorch S4-lite fallback is included automatically if not installed
