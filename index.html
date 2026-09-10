@@ -1725,6 +1725,9 @@ function analyzeAudioChunk(rawSamples, sampleRate = 16000) {
       d2.push(pitches[i] - 2 * pitches[i - 1] + pitches[i - 2]);
     }
     const d2Mean = d2.reduce((a, b) => a + b, 0) / d2.length;
+    f0D2Std = Math.sqrt(d2.reduce((a, b) => a + (b - d2Mean) ** 2, 0) / d2.length);
+  }
+
   const bwRatio = (totalHighEnergy + 1e-10) / (totalLowEnergy + 1e-10);
   const subBassRatio = (totalSubBassEnergy + 1e-10) / (totalLowEnergy + 1e-10);
 
