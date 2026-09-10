@@ -28,6 +28,21 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: "Fetch model from Google Drive"
+        run: |
+          python data/download_from_drive.py --target models
+
       - name: "Run pytest test suite"
         run: |
           python -m pytest tests/ -v --tb=short
+
+      - name: "Verify detector initialization & model"
+        run: |
+          python -c "
+          from src.models.cm_classifier import build_cm_classifier
+          import torch
+          m = build_cm_classifier(use_mamba=False)
+          sd = torch.load('models/cm_detect2b_v3.pt', map_location='cpu', weights_only=False)
+          m.load_state_dict(sd)
+          print('[OK] Hardened DETECT-2B v3 model verified successfully!')
+          "

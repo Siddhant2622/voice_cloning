@@ -82,3 +82,4 @@ data/gdrive_link.txt
 data/modern_dataset/
 data/raw_downloads/
 data/modern_features_cache_*.pt
+models/*backup*.pt

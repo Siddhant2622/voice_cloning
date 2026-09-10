@@ -38,6 +38,27 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 # Dataset registry
 # ---------------------------------------------------------------------------
 DATASETS = {
+    "drive": {
+        "description": "Google Drive VoiceGuard-Dataset (ASVspoof 2017 V2, Modern Dataset, Models)",
+        "url": "https://drive.google.com/drive/folders/1B5xNpwBbyI8a_RyK86wAFCl82K-ExjNe",
+        "sha256": None,
+        "out_dir": "asvspoof2017",
+        "size_gb": 0.40,
+    },
+    "gdrive": {
+        "description": "Google Drive VoiceGuard-Dataset (Alias for drive)",
+        "url": "https://drive.google.com/drive/folders/1B5xNpwBbyI8a_RyK86wAFCl82K-ExjNe",
+        "sha256": None,
+        "out_dir": "asvspoof2017",
+        "size_gb": 0.40,
+    },
+    "asvspoof2017": {
+        "description": "ASVspoof 2017 V2 — Physical Access / Replay & Microphone Transmission (25 mics, 26 rooms)",
+        "url": "http://dx.doi.org/10.7488/ds/2332",
+        "sha256": None,
+        "out_dir": "asvspoof2017",
+        "size_gb": 0.35,
+    },
     "asvspoof2019": {
         "description": "ASVspoof 2019 Logical Access (LA) — 118K utterances, 19 TTS/VC attacks",
         "note": (
@@ -183,6 +204,12 @@ def download_mlaad(out_root: Path) -> Path:
     return out_dir
 
 
+def download_asvspoof2017(out_root: Path) -> Path:
+    from data.download_asvspoof import download_asvspoof_2017
+    out_dir = out_root / "asvspoof2017"
+    return download_asvspoof_2017(partitions=["train", "dev"], out_dir=out_dir)
+
+
 # ---------------------------------------------------------------------------
 # Hugging Face Hub helpers
 # ---------------------------------------------------------------------------
@@ -300,10 +327,15 @@ def main() -> None:
         return
 
     # Downloadable datasets
-    if args.dataset == "wavefake":
+    if args.dataset in ("drive", "gdrive"):
+        from data.download_from_drive import fetch_from_drive
+        fetch_from_drive(target="all")
+    elif args.dataset == "wavefake":
         download_wavefake(out_root)
     elif args.dataset == "in-the-wild":
         download_in_the_wild(out_root)
+    elif args.dataset == "asvspoof2017":
+        download_asvspoof2017(out_root)
     elif args.dataset == "mlaad":
         download_mlaad(out_root)
     else:

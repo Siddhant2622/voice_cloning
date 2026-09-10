@@ -38,6 +38,8 @@ python-dotenv>=1.0.0
 
 # --- Cloud / model hub ---
 huggingface_hub>=0.22.0        # push/pull checkpoints from HF Hub
+gdown>=5.0.0                  # fetch datasets & models from Google Drive
+pydrive2>=1.21.0              # authenticated Google Drive client
 
 # --- Rate limiting ---
 slowapi>=0.1.9                  # SlowAPI rate limiter for FastAPI

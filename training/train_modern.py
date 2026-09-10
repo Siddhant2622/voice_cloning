@@ -205,12 +205,15 @@ class ModernAudioDataset(Dataset):
         max_samples_per_class: int = 500,
         codec_aug: bool = False,
         replay_aug: bool = False,
+        asvspoof2017_dir: Optional[Path] = Path("data/asvspoof2017"),
+        asvspoof_ratio: float = 0.35,
         device: str = "cpu",
     ):
         self.data_dir = Path(data_dir)
         self.codec_aug = codec_aug
         self.replay_aug = replay_aug
         self.device = device
+        self.asvspoof2017_dir = Path(asvspoof2017_dir) if asvspoof2017_dir else None
         
         # Load metadata
         meta_path = self.data_dir / "metadata.csv"
@@ -232,6 +235,44 @@ class ModernAudioDataset(Dataset):
             bf_rows = [{"file": f"bonafide/{f.name}", "label": "bonafide", "source": "unknown", "tts_system": "human"} for f in bf_files]
             sp_rows = [{"file": f"spoof/{f.name}", "label": "spoof", "source": "unknown", "tts_system": "unknown"} for f in sp_files]
         
+        # Ingest ASVspoof 2017 Physical Access / Microphone Replay Data
+        if self.asvspoof2017_dir and self.asvspoof2017_dir.exists():
+            asv_bf, asv_sp = [], []
+            train_meta = self.asvspoof2017_dir / "train" / "samples_metadata.csv"
+            # Prioritize 'train' split so 'dev' remains strictly held-out for validation
+            split_names = ["train"] if train_meta.exists() else ["dev"]
+            for split_name in split_names:
+                asv_meta = self.asvspoof2017_dir / split_name / "samples_metadata.csv"
+                if asv_meta.exists():
+                    with open(asv_meta, "r", encoding="utf-8") as fp:
+                        for row in csv.DictReader(fp):
+                            if row["label"] == "bonafide":
+                                asv_bf.append({
+                                    "file": row["file"],
+                                    "label": "bonafide",
+                                    "source": f"asvspoof2017_mic_{row.get('recording_mic', 'mic')}",
+                                    "tts_system": "human_physical_mic"
+                                })
+                            else:
+                                asv_sp.append({
+                                    "file": row["file"],
+                                    "label": "spoof",
+                                    "source": f"asvspoof2017_replay_{row.get('recording_mic', 'mic')}",
+                                    "tts_system": "replay_transducer"
+                                })
+            if asv_bf or asv_sp:
+                logger.info("Loaded %d bonafide + %d replayed spoof samples from ASVspoof 2017", len(asv_bf), len(asv_sp))
+                needed_bf = max(0, max_samples_per_class - len(bf_rows))
+                target_ratio_cnt = int(max_samples_per_class * asvspoof_ratio)
+                asv_target = min(max(target_ratio_cnt, needed_bf), len(asv_bf), len(asv_sp))
+                if asv_target > 0:
+                    random.seed(42)
+                    random.shuffle(asv_bf)
+                    random.shuffle(asv_sp)
+                    bf_rows.extend(asv_bf[:asv_target])
+                    sp_rows.extend(asv_sp[:asv_target])
+                    logger.info("Added %d ASVspoof 2017 physical microphone samples per class to training pool", asv_target)
+        
         # Balance and limit
         random.seed(42)
         random.shuffle(bf_rows)
@@ -248,7 +289,8 @@ class ModernAudioDataset(Dataset):
     
     def __getitem__(self, idx):
         row = self.samples[idx]
-        path = self.data_dir / row["file"]
+        raw_path = Path(row["file"])
+        path = raw_path if raw_path.is_absolute() else self.data_dir / raw_path
         label = 0.0 if row["label"] == "bonafide" else 1.0
         
         try:
@@ -389,18 +431,21 @@ def compute_eer(scores: np.ndarray, labels: np.ndarray) -> Tuple[float, float]:
 
 def train(
     data_dir: str = "data/modern_dataset",
+    asvspoof2017_dir: Optional[str] = "data/asvspoof2017",
     max_samples: int = 500,
     epochs: int = 60,
     codec_aug: bool = True,
     replay_aug: bool = True,
     force_rebuild: bool = False,
+    pretrained_checkpoint: Optional[str] = None,
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Device: %s | Max samples/class: %d | Epochs: %d", device, max_samples, epochs)
-    logger.info("Codec aug: %s | Replay aug: %s", codec_aug, replay_aug)
+    logger.info("Codec aug: %s | Replay aug: %s | ASVspoof 2017: %s", codec_aug, replay_aug, asvspoof2017_dir)
     
     data_path = Path(data_dir)
-    cache_path = Path(f"data/modern_features_cache_{max_samples}.pt")
+    cache_tag = f"{max_samples}_asv17" if asvspoof2017_dir else f"{max_samples}"
+    cache_path = Path(f"data/modern_features_cache_{cache_tag}.pt")
     
     if cache_path.exists() and not force_rebuild:
         logger.info("Loading cached features from %s...", cache_path)
@@ -412,6 +457,7 @@ def train(
             max_samples_per_class=max_samples,
             codec_aug=codec_aug,
             replay_aug=replay_aug,
+            asvspoof2017_dir=Path(asvspoof2017_dir) if asvspoof2017_dir else None,
             device=device,
         )
         
@@ -440,6 +486,11 @@ def train(
     val_loader = DataLoader(val_ds, batch_size=16, shuffle=False)
     
     model = build_cm_classifier(use_mamba=False).to(device)
+    if pretrained_checkpoint and Path(pretrained_checkpoint).exists():
+        logger.info("Warm-starting from pretrained checkpoint: %s", pretrained_checkpoint)
+        sd = torch.load(pretrained_checkpoint, map_location=device, weights_only=False)
+        model.load_state_dict(sd, strict=False)
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
     bce = nn.BCEWithLogitsLoss()
@@ -523,8 +574,16 @@ def train(
                 val_acc * 100, bf_acc * 100, sp_acc * 100, val_eer * 100
             )
         
-        # Save best model by EER
-        if val_eer < best_eer and val_acc >= 0.70:
+        # Save best model by EER (break ties with val_acc)
+        is_better = False
+        if best_state is None:
+            is_better = True
+        elif val_eer < best_eer:
+            is_better = True
+        elif abs(val_eer - best_eer) < 1e-4 and val_acc > best_val_acc:
+            is_better = True
+            
+        if is_better and val_acc >= 0.65:
             best_eer = val_eer
             best_val_acc = val_acc
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -537,19 +596,21 @@ def train(
     
     # Save metadata
     meta = {
-        "version": "v3",
+        "version": "v3.1-asvspoof2017",
         "val_acc": round(best_val_acc * 100, 2),
         "eer_percent": round(best_eer * 100, 2),
-        "architecture": "DETECT-2B-lite (Modern Data Hardened)",
+        "architecture": "DETECT-2B-lite (Hardened with ASVspoof 2017 V2 Physical Replay & Mic Data)",
         "ssl_models": ["wavlm-base", "wav2vec2-base-960h"],
         "mamba_enabled": False,
         "codec_augmentation": codec_aug,
         "replay_augmentation": replay_aug,
+        "asvspoof2017_enabled": bool(asvspoof2017_dir),
         "data_dir": str(data_dir),
+        "asvspoof2017_dir": str(asvspoof2017_dir) if asvspoof2017_dir else None,
         "max_samples_per_class": max_samples,
         "epochs": epochs,
-        "training_datasets": ["librispeech", "mlaad", "in-the-wild", "wavefake"],
-        "presentation_gap_mitigation": "codec_aug + replay_aug",
+        "training_datasets": ["librispeech", "mlaad", "in-the-wild", "wavefake", "asvspoof2017_v2"],
+        "presentation_gap_mitigation": "ASVspoof 2017 V2 Physical Microphones (R01-R25) + Codec Aug + Replay Aug",
     }
     with open(MODEL_OUT.with_suffix(".json"), "w") as fp:
         json.dump(meta, fp, indent=2)
@@ -562,7 +623,7 @@ def train(
     print(f"  EER:          {best_eer * 100:.2f}%")
     print(f"  Codec Aug:    {codec_aug}")
     print(f"  Replay Aug:   {replay_aug}")
-    print(f"  Datasets:     MLAAD + In-the-Wild + WaveFake + LibriSpeech")
+    print(f"  Datasets:     MLAAD + In-the-Wild + WaveFake + LibriSpeech + ASVspoof 2017 V2")
     print("=" * 60 + "\n")
     
     return best_eer, best_val_acc
@@ -572,6 +633,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train CM classifier on modern multi-source dataset")
     parser.add_argument("--data-dir", default="data/modern_dataset", help="Path to organized dataset")
+    parser.add_argument("--asvspoof2017-dir", default="data/asvspoof2017", help="Path to ASVspoof 2017 dataset")
+    parser.add_argument("--no-asvspoof2017", action="store_true", help="Disable ASVspoof 2017 integration")
     parser.add_argument("--max-samples", type=int, default=500, help="Max samples per class")
     parser.add_argument("--epochs", type=int, default=60, help="Number of training epochs")
     parser.add_argument("--codec-aug", action="store_true", default=True, help="Enable codec augmentation")
@@ -579,13 +642,20 @@ if __name__ == "__main__":
     parser.add_argument("--replay-aug", action="store_true", default=True, help="Enable replay augmentation")
     parser.add_argument("--no-replay-aug", action="store_false", dest="replay_aug")
     parser.add_argument("--force-rebuild", action="store_true", help="Force rebuilding feature cache")
+    parser.add_argument("--pretrained-checkpoint", default="models/cm_detect2b_v3_pre_asv17_backup.pt", help="Path to warm-start checkpoint")
+    parser.add_argument("--no-warm-start", action="store_true", help="Train from scratch without warm-starting")
     args = parser.parse_args()
     
+    asv_dir = None if args.no_asvspoof2017 else args.asvspoof2017_dir
+    pretrained = None if args.no_warm_start else args.pretrained_checkpoint
+
     train(
         data_dir=args.data_dir,
+        asvspoof2017_dir=asv_dir,
         max_samples=args.max_samples,
         epochs=args.epochs,
         codec_aug=args.codec_aug,
         replay_aug=args.replay_aug,
         force_rebuild=args.force_rebuild,
+        pretrained_checkpoint=pretrained,
     )

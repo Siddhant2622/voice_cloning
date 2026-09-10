@@ -2010,6 +2010,24 @@ function evaluateEdgeRisk(analysis) {
       reasons.push(`synthesizer bandwidth cutoff`);
     }
 
+    // ── 6. Physical Replay & Microphone Compensation (ASVspoof 2017 V2) ──
+    // Microphone preamps on laptops/smartphones create ambient thermal high-frequency floor.
+    // When physiological laryngeal tremor (d2 > 28) and natural glottal turbulence (cpp <= 3.8)
+    // are confirmed, discount ambient mic hiss to eliminate false alarms on real mics.
+    const isBiologicalLarynx = (nPitch >= 6 && d2 > 28.0 && cpp <= 3.8);
+    if (isBiologicalLarynx) {
+      if (hf > 2.0) llr -= 1.2; // compensate for laptop mic thermal hiss
+      if (tilt > -14.0 && tilt <= -12.0) llr -= 0.8; // compensate for electret low-end rolloff
+    }
+
+    // Physical loudspeaker-to-microphone replay signature (ASVspoof 2017 replay attack):
+    // Characterized by lack of involuntary laryngeal tremor (d2 < 24) combined with
+    // speaker transducer non-linear distortion (hf > 1.8, or tilt > -13.0) and high periodicity (cpp >= 4.1).
+    if (nPitch >= 6 && d2 < 24.0 && (cpp >= 4.1 || tilt > -13.0) && (hf > 1.8 || flat > 0.08)) {
+      llr += 2.6;
+      reasons.push(`physical replay acoustic signature (loudspeaker air-path distortion)`);
+    }
+
     // Logistic posterior probability
     const instantProb = 1.0 / (1.0 + Math.exp(-llr));
 

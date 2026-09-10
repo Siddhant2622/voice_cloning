@@ -1,0 +1,70 @@
+{
+  "dataset": "ASVspoof 2017 Version 2.0 (Physical Access / Replay & Microphones)",
+  "split": "dev",
+  "checkpoint": "models/cm_detect2b_v3_pre_asv17_backup.pt",
+  "total_samples": 200,
+  "bonafide_count": 100,
+  "replayed_spoof_count": 100,
+  "eer_percent": 58.0,
+  "optimal_threshold": 0.0047,
+  "accuracy_percent": 42.0,
+  "precision": 0.42,
+  "recall": 0.42,
+  "f1_score": 0.42,
+  "tp": 42,
+  "tn": 42,
+  "fp": 58,
+  "fn": 58,
+  "microphones_evaluated": 7,
+  "microphone_breakdown": {
+    "R01": {
+      "name": "Zoom H6 handy recorder",
+      "samples": 6,
+      "replayed_spoof_detection_rate": 0.16666666666666666,
+      "accuracy": 16.67,
+      "mean_spoof_score": 0.006609018892049789
+    },
+    "R02": {
+      "name": "BQ Aquaris M5 smartphone",
+      "samples": 7,
+      "replayed_spoof_detection_rate": 0.0,
+      "accuracy": 0.0,
+      "mean_spoof_score": 0.0029370783761675867
+    },
+    "R03": {
+      "name": "Low-quality headset",
+      "samples": 10,
+      "replayed_spoof_detection_rate": 0.2,
+      "accuracy": 20.0,
+      "mean_spoof_score": 0.027670628181658684
+    },
+    "R04": {
+      "name": "Nokia Lumia 635 smartphone",
+      "samples": 10,
+      "replayed_spoof_detection_rate": 0.0,
+      "accuracy": 0.0,
+      "mean_spoof_score": 0.003201820678077638
+    },
+    "R05": {
+      "name": "Rode NT2 microphone",
+      "samples": 21,
+      "replayed_spoof_detection_rate": 0.5714285714285714,
+      "accuracy": 57.14,
+      "mean_spoof_score": 0.035083636186928266
+    },
+    "R06": {
+      "name": "Rode smartLav+ microphone",
+      "samples": 21,
+      "replayed_spoof_detection_rate": 0.7142857142857143,
+      "accuracy": 71.43,
+      "mean_spoof_score": 0.0100520823394791
+    },
+    "R07": {
+      "name": "Samsung Galaxy S7 smartphone",
+      "samples": 25,
+      "replayed_spoof_detection_rate": 0.48,
+      "accuracy": 48.0,
+      "mean_spoof_score": 0.12290780058130622
+    }
+  }
+}

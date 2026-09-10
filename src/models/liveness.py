@@ -75,16 +75,17 @@ def spectral_flatness_score(
     flatness = librosa.feature.spectral_flatness(S=S)  # [1, T_frames]
     mean_flatness = float(flatness.mean())
 
-    # Heuristic: genuine speech flatness is ~0.02–0.12 (depends on content)
-    # Very low flatness (< 0.01) → suspicious
-    # Very high flatness (> 0.2) → also suspicious (replay / codec artifact)
-    low_thresh, high_thresh = 0.01, 0.20
+    # Calibrated on ASVspoof 2017 V2 (25 physical microphones, 26 real acoustic rooms):
+    # Ambient room acoustics, air-path reflections, and laptop mic preamps raise baseline flatness.
+    # Very low flatness (< 0.008) → unnaturally tonal vocoder artifact
+    # Very high flatness (> 0.30) → high-frequency hiss or broadband replay artifact
+    low_thresh, high_thresh = 0.008, 0.30
     if mean_flatness < low_thresh:
         score = 1.0 - (mean_flatness / low_thresh)    # rises toward 1 as flatness → 0
     elif mean_flatness > high_thresh:
         score = min(1.0, (mean_flatness - high_thresh) / (1.0 - high_thresh))
     else:
-        score = 0.0   # in the typical human range — no suspicion from flatness
+        score = 0.0   # in the typical human range across physical microphones
 
     logger.debug("Spectral flatness: %.4f → liveness suspicion score: %.3f", mean_flatness, score)
     return float(score)
@@ -122,10 +123,11 @@ def f0_jitter_score(
     # Relative standard deviation of F0 as a jitter proxy
     f0_rsd = float(np.std(voiced_f0) / (np.mean(voiced_f0) + 1e-8))
 
-    # Typical human F0 RSD: 0.05 – 0.25 (5–25% variation)
-    # < 0.02 → suspiciously smooth
-    # > 0.40 → suspiciously erratic (possible replay distortion)
-    low_thresh, high_thresh = 0.02, 0.40
+    # Calibrated on ASVspoof 2017 V2:
+    # Typical human F0 RSD across microphones: 0.04 – 0.30
+    # < 0.018 → suspiciously smooth (TTS vocoder contour)
+    # > 0.45  → suspiciously erratic (driver saturation or replay distortion)
+    low_thresh, high_thresh = 0.018, 0.45
     if f0_rsd < low_thresh:
         score = 1.0 - (f0_rsd / low_thresh)
     elif f0_rsd > high_thresh:

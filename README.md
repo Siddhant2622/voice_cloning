@@ -76,15 +76,33 @@ python demo/server.py
 python demo/stream_file.py data/samples/synthetic_00.wav
 ```
 
-### 7. Evaluate on ASVspoof (Phase 3)
+### 7. Fetch Datasets & Hardened Models from Google Drive
+```bash
+# Fetch ASVspoof 2017 V2 physical microphone dataset
+python data/download_from_drive.py --target asvspoof2017
+
+# Fetch hardened DETECT-2B v3 model checkpoint
+python data/download_from_drive.py --target models
+
+# Or fetch everything
+python data/download_from_drive.py --target all
+```
+
+### 8. Evaluate on ASVspoof 2017 V2 (Physical Microphones & Replay)
+```bash
+# Benchmark on real physical microphones (R01–R07)
+python training/eval_asvspoof2017.py --split dev --checkpoint models/cm_detect2b_v3.pt
+```
+
+### 9. Evaluate on ASVspoof 2019 (Phase 3)
 
 ```bash
 python data/download_asvspoof.py --partition eval
-python training/train_fusion.py --data data/ASVspoof2019_LA --cm-model models/cm.pt
+python training/train_fusion.py --data data/ASVspoof2019_LA --cm-model models/cm_detect2b_v3.pt
 python evaluate.py --data data/ASVspoof2019_LA --partition eval
 ```
 
-### 8. Run tests
+### 10. Run tests
 
 ```bash
 python -m pytest tests/ -v
