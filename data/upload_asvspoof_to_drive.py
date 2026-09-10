@@ -141,6 +141,8 @@ def main():
     # 3. Upload hardened models to models/ folder
     model_folder_id = get_or_create_folder(drive, "models", parent_id=root_id)
     for model_file in [
+        Path("models/cm_detect2b_v4.pt"),      # NEW: mobile-replay-hardened v4
+        Path("models/cm_detect2b_v4.json"),
         Path("models/cm_detect2b_v3.pt"),
         Path("models/cm_detect2b_v3.json"),
         Path("models/cm_detect2b_v3_pre_asv17_backup.pt"),
@@ -148,10 +150,14 @@ def main():
         if model_file.exists():
             upload_file(drive, model_file, model_folder_id, overwrite=True)
 
-    # 4. Upload feature cache
-    cache_file = Path("data/modern_features_cache_350_asv17.pt")
-    if cache_file.exists():
-        upload_file(drive, cache_file, asv_folder_id, overwrite=True)
+    # 4. Upload feature cache (v4 cache uses mobile_replay_chain augmentation)
+    for cache_file in [
+        Path("data/modern_features_cache_500_asv17_v4.pt"),
+        Path("data/modern_features_cache_350_asv17_v4.pt"),
+        Path("data/modern_features_cache_350_asv17.pt"),  # keep v3 cache too
+    ]:
+        if cache_file.exists():
+            upload_file(drive, cache_file, asv_folder_id, overwrite=True)
 
     print("\n" + "=" * 60)
     print("[OK] DATASET & HARDENED MODEL SUCCESSFULLY PUSHED TO DRIVE!")

@@ -189,7 +189,7 @@ def main() -> int:
     # ── Step 3: CM scoring ─────────────────────────────────────────────────
     cm_ckpt = args.model
     if not cm_ckpt:
-        for candidate in ["models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
+        for candidate in ["models/cm_detect2b_v4.pt", "models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
             if Path(candidate).exists():
                 cm_ckpt = candidate
                 break

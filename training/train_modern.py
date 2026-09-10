@@ -11,9 +11,13 @@ Key improvements over train_balanced.py:
   - Reads from data/modern_dataset/ (organized by download_modern_data.py)
   - Supports codec augmentation (G.711, Opus, MP3) on-the-fly
   - Supports replay augmentation on-the-fly
+  - apply_mobile_replay_chain(): new label-aware augmentation that simulates
+    AI/TTS voice played on Phone-A speaker -> air propagation -> Phone-B mic
+    capture, including mobile bandpass, speaker distortion, AGC, and codec.
+    Applied with p=0.70 to TTS/clone spoof samples to fix cross-device detection.
   - Evaluates with Equal Error Rate (EER) instead of just accuracy
   - Configurable max samples per class
-  - Saves v3 checkpoint with full metadata
+  - Saves v4 checkpoint with full metadata
 
 Usage:
     python training/train_modern.py
@@ -52,7 +56,7 @@ from src.models.cm_classifier import build_cm_classifier
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("train_modern")
 
-MODEL_OUT = Path("models/cm_detect2b_v3.pt")
+MODEL_OUT = Path("models/cm_detect2b_v4.pt")
 MAX_SECONDS = 3.0
 TARGET_SR = 16000
 TARGET_FRAMES = int(MAX_SECONDS * 100)  # ~300 mel frames
@@ -189,6 +193,103 @@ def apply_replay_augmentation(wav: np.ndarray, sr: int = 16000) -> np.ndarray:
     return out
 
 
+def apply_mobile_replay_chain(wav: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Simulate AI voice played on Phone-A speaker → air → Phone-B microphone.
+
+    This is the exact attack vector the user reported: TTS/cloned audio rendered
+    on one device and recorded by another device's built-in microphone.
+
+    The chain applies, in order:
+      1. Mobile speaker bandpass (cheap driver: ~400–3800 Hz cut-off range)
+      2. Harmonic distortion (cheap speaker membrane nonlinearity)
+      3. Room impulse response convolution (short RT60: 0.05–0.25 s)
+      4. Mobile microphone bandpass (MEMS mic: ~200–4500 Hz range)
+      5. AGC compression (automatic gain control flattens dynamics)
+      6. Additive mobile ambient noise (fan hiss, crowd, handling)
+      7. Codec (G.711 or Opus 16kbps — typical of a voice-call recording app)
+    """
+    # 1. Loudspeaker frequency response (band-pass with resonance roll-off)
+    lo_hz = random.uniform(350.0, 500.0)
+    hi_hz = random.uniform(3200.0, 3900.0)
+    nyq = sr / 2.0
+    b_hp, a_hp = signal.butter(2, lo_hz / nyq, btype="high")
+    b_lp, a_lp = signal.butter(4, hi_hz / nyq, btype="low")
+    out = signal.filtfilt(b_hp, a_hp, wav).astype(np.float32)
+    out = signal.filtfilt(b_lp, a_lp, out).astype(np.float32)
+
+    # 2. Cheap speaker harmonic distortion (soft-clipping + 2nd/3rd harmonic)
+    dist_amount = random.uniform(0.01, 0.06)  # 1–6% THD
+    out = out + dist_amount * (out ** 2) - dist_amount * 0.5 * (out ** 3)
+    out = np.clip(out, -1.0, 1.0).astype(np.float32)
+
+    # 3. Short room impulse (small to medium room: 0.05–0.25 s RT60)
+    rt60 = random.uniform(0.05, 0.25)
+    n_rir = int(rt60 * sr)
+    t_rir = np.linspace(0, rt60, n_rir, endpoint=False)
+    rir = np.zeros(n_rir, dtype=np.float32)
+    direct_idx = int(0.002 * sr)
+    if direct_idx < n_rir:
+        rir[direct_idx] = 1.0
+    for delay_ms in [5, 9, 14, 20]:
+        idx = int(delay_ms * sr / 1000)
+        if idx < n_rir:
+            rir[idx] = random.uniform(0.05, 0.25) * random.choice([-1, 1])
+    decay = np.exp(-6.908 * t_rir / rt60)
+    rir += np.random.randn(n_rir).astype(np.float32) * 0.01 * decay
+    rir /= (np.abs(rir).max() + 1e-8)
+    out = signal.fftconvolve(out, rir, mode="full")[:len(wav)].astype(np.float32)
+
+    # 4. Receiving MEMS microphone response (wider than speaker, slight mid-boost)
+    mic_lo = random.uniform(180.0, 280.0)
+    mic_hi = random.uniform(4000.0, 4800.0)
+    b_hp2, a_hp2 = signal.butter(2, mic_lo / nyq, btype="high")
+    b_lp2, a_lp2 = signal.butter(3, mic_hi / nyq, btype="low")
+    out = signal.filtfilt(b_hp2, a_hp2, out).astype(np.float32)
+    out = signal.filtfilt(b_lp2, a_lp2, out).astype(np.float32)
+
+    # 5. AGC: compresses dynamic range (attack fast, release slow)
+    frame_len = int(0.02 * sr)  # 20ms frames
+    target_rms = 0.08
+    agc_out = np.zeros_like(out)
+    gain = 1.0
+    for i in range(0, len(out), frame_len):
+        frame = out[i:i + frame_len]
+        rms = np.sqrt(np.mean(frame ** 2) + 1e-10)
+        desired_gain = target_rms / rms if rms > 1e-6 else gain
+        # Smooth gain (attack=0.1 frame, release=0.5 frame)
+        alpha = 0.1 if desired_gain < gain else 0.5
+        gain = alpha * desired_gain + (1 - alpha) * gain
+        gain = np.clip(gain, 0.1, 8.0)
+        agc_out[i:i + frame_len] = frame * gain
+    out = agc_out.astype(np.float32)
+
+    # 6. Ambient noise: fan/crowd/handling noise (SNR 14–28 dB)
+    snr_db = random.uniform(14.0, 28.0)
+    sig_power = np.mean(out ** 2) + 1e-10
+    noise_power = sig_power / (10 ** (snr_db / 10))
+    # Mix white noise with some pink tint for realism
+    white = np.random.randn(len(out)).astype(np.float32)
+    # Rough pink tint: simple IIR
+    b_pink = np.array([0.049922, -0.095993, 0.050612, -0.004408])
+    a_pink = np.array([1.0, -2.494956, 2.017265, -0.522949])
+    pink = signal.lfilter(b_pink, a_pink, white).astype(np.float32)
+    pink_rms = np.sqrt(np.mean(pink ** 2) + 1e-10)
+    out += pink * (np.sqrt(noise_power) / pink_rms)
+
+    # 7. Codec simulation (G.711 phone call or 16kbps Opus messenger audio)
+    codec_choice = random.choice(["g711", "opus_16", "none"])
+    if codec_choice == "g711":
+        out = _apply_codec_g711(out, sr)
+    elif codec_choice == "opus_16":
+        out = _apply_codec_opus(out, sr, bitrate=16)
+
+    # Final normalize
+    mx = np.abs(out).max()
+    if mx > 1e-6:
+        out = out / mx * 0.90
+    return out.astype(np.float32)
+
+
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
@@ -292,6 +393,13 @@ class ModernAudioDataset(Dataset):
         raw_path = Path(row["file"])
         path = raw_path if raw_path.is_absolute() else self.data_dir / raw_path
         label = 0.0 if row["label"] == "bonafide" else 1.0
+
+        # Determine if this is a TTS/clone spoof sample (vs replay of genuine voice)
+        tts_system = row.get("tts_system", "")
+        is_tts_spoof = (
+            label == 1.0
+            and tts_system not in ("", "human", "human_physical_mic", "replay_transducer")
+        )
         
         try:
             data, sr = sf.read(str(path))
@@ -304,15 +412,38 @@ class ModernAudioDataset(Dataset):
             logger.warning("Error loading %s: %s — returning zeros", path, e)
             wav_np = np.zeros(int(MAX_SECONDS * TARGET_SR), dtype=np.float32)
             wav_16k = torch.zeros(int(MAX_SECONDS * TARGET_SR))
-        
-        # Apply augmentation (to spoof samples with 50% probability, or any with 30%)
-        if self.codec_aug and random.random() < 0.4:
-            wav_np = apply_codec_augmentation(wav_np, TARGET_SR)
-            wav_16k = torch.from_numpy(wav_np).float()
-        
-        if self.replay_aug and random.random() < 0.3:
-            wav_np = apply_replay_augmentation(wav_np, TARGET_SR)
-            wav_16k = torch.from_numpy(wav_np).float()
+
+        # --------------------------------------------------------------------------
+        # Label-aware augmentation strategy:
+        #
+        #  TTS/clone spoof  →  apply mobile replay chain with p=0.70 to simulate the
+        #                       "AI voice from Phone-A speaker → Phone-B mic" attack.
+        #                       This generates hard-negatives the model never saw before.
+        #
+        #  Replay/physical spoof → apply standard RIR replay augmentation with p=0.50
+        #                          (the ASVspoof 2017 samples already carry transducer
+        #                           effects; a second pass adds variety).
+        #
+        #  Bonafide          →  codec augmentation only (p=0.25) to teach invariance
+        #                       to phone/VOIP compression without adding spoof cues.
+        # --------------------------------------------------------------------------
+        if is_tts_spoof:
+            # 70% chance: full mobile replay chain (primary fix for cross-device issue)
+            if self.replay_aug and random.random() < 0.70:
+                wav_np = apply_mobile_replay_chain(wav_np, TARGET_SR)
+                wav_16k = torch.from_numpy(wav_np).float()
+            elif self.codec_aug and random.random() < 0.40:
+                # Remaining 30% of TTS spoof: codec-only (keeps some clean TTS in pool)
+                wav_np = apply_codec_augmentation(wav_np, TARGET_SR)
+                wav_16k = torch.from_numpy(wav_np).float()
+        elif label == 1.0:  # replay_transducer from ASVspoof 2017
+            if self.replay_aug and random.random() < 0.50:
+                wav_np = apply_replay_augmentation(wav_np, TARGET_SR)
+                wav_16k = torch.from_numpy(wav_np).float()
+        else:  # bonafide
+            if self.codec_aug and random.random() < 0.25:
+                wav_np = apply_codec_augmentation(wav_np, TARGET_SR)
+                wav_16k = torch.from_numpy(wav_np).float()
         
         # Trim/pad
         max_len = int(MAX_SECONDS * TARGET_SR)
@@ -444,7 +575,8 @@ def train(
     logger.info("Codec aug: %s | Replay aug: %s | ASVspoof 2017: %s", codec_aug, replay_aug, asvspoof2017_dir)
     
     data_path = Path(data_dir)
-    cache_tag = f"{max_samples}_asv17" if asvspoof2017_dir else f"{max_samples}"
+    # v4: cache tag bumped to bust old cache after mobile_replay_chain augmentation was added
+    cache_tag = f"{max_samples}_asv17_v4" if asvspoof2017_dir else f"{max_samples}_v4"
     cache_path = Path(f"data/modern_features_cache_{cache_tag}.pt")
     
     if cache_path.exists() and not force_rebuild:

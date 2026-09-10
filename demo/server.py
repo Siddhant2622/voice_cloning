@@ -110,7 +110,7 @@ def _load_models():
     logger.info("Loading models on %s...", device)
 
     cm_ckpt = None
-    for candidate in ["models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
+    for candidate in ["models/cm_detect2b_v4.pt", "models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
         if Path(candidate).exists():
             cm_ckpt = candidate
             break
