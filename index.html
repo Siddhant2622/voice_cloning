@@ -1740,17 +1740,25 @@ async function startMic() {
   if (audioCtx.state === 'suspended') await audioCtx.resume();
 
   try {
+    // This app analyzes raw audio for voice-detection, so browser processing (echo cancellation, AGC, noise suppression) would distort the signal
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: true,
+        echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: true,
+        autoGainControl: false,
         channelCount: 1
       }
     });
   } catch(e) {
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1
+        }
+      });
     } catch(e2) {
       alert('Microphone access denied: ' + e2.message);
       return;
