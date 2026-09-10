@@ -205,89 +205,105 @@ def apply_mobile_replay_chain(wav: np.ndarray, sr: int = 16000) -> np.ndarray:
       3. Room impulse response convolution (short RT60: 0.05–0.25 s)
       4. Mobile microphone bandpass (MEMS mic: ~200–4500 Hz range)
       5. AGC compression (automatic gain control flattens dynamics)
-      6. Additive mobile ambient noise (fan hiss, crowd, handling)
+      6. Additive mobile ambient noise (LP-filtered white noise, SNR 14-28 dB)
       7. Codec (G.711 or Opus 16kbps — typical of a voice-call recording app)
     """
-    # 1. Loudspeaker frequency response (band-pass with resonance roll-off)
-    lo_hz = random.uniform(350.0, 500.0)
-    hi_hz = random.uniform(3200.0, 3900.0)
-    nyq = sr / 2.0
-    b_hp, a_hp = signal.butter(2, lo_hz / nyq, btype="high")
-    b_lp, a_lp = signal.butter(4, hi_hz / nyq, btype="low")
-    out = signal.filtfilt(b_hp, a_hp, wav).astype(np.float32)
-    out = signal.filtfilt(b_lp, a_lp, out).astype(np.float32)
+    try:
+        nyq = sr / 2.0
 
-    # 2. Cheap speaker harmonic distortion (soft-clipping + 2nd/3rd harmonic)
-    dist_amount = random.uniform(0.01, 0.06)  # 1–6% THD
-    out = out + dist_amount * (out ** 2) - dist_amount * 0.5 * (out ** 3)
-    out = np.clip(out, -1.0, 1.0).astype(np.float32)
+        # 1. Loudspeaker frequency response (band-pass with resonance roll-off)
+        lo_hz = random.uniform(350.0, 500.0)
+        hi_hz = random.uniform(3200.0, 3900.0)
+        b_hp, a_hp = signal.butter(2, lo_hz / nyq, btype="high")
+        b_lp, a_lp = signal.butter(4, hi_hz / nyq, btype="low")
+        out = signal.filtfilt(b_hp, a_hp, wav).astype(np.float32)
+        out = signal.filtfilt(b_lp, a_lp, out).astype(np.float32)
 
-    # 3. Short room impulse (small to medium room: 0.05–0.25 s RT60)
-    rt60 = random.uniform(0.05, 0.25)
-    n_rir = int(rt60 * sr)
-    t_rir = np.linspace(0, rt60, n_rir, endpoint=False)
-    rir = np.zeros(n_rir, dtype=np.float32)
-    direct_idx = int(0.002 * sr)
-    if direct_idx < n_rir:
-        rir[direct_idx] = 1.0
-    for delay_ms in [5, 9, 14, 20]:
-        idx = int(delay_ms * sr / 1000)
-        if idx < n_rir:
-            rir[idx] = random.uniform(0.05, 0.25) * random.choice([-1, 1])
-    decay = np.exp(-6.908 * t_rir / rt60)
-    rir += np.random.randn(n_rir).astype(np.float32) * 0.01 * decay
-    rir /= (np.abs(rir).max() + 1e-8)
-    out = signal.fftconvolve(out, rir, mode="full")[:len(wav)].astype(np.float32)
+        # 2. Cheap speaker harmonic distortion (soft-clipping + 2nd/3rd harmonic)
+        dist_amount = random.uniform(0.01, 0.06)  # 1–6% THD
+        out = out + dist_amount * (out ** 2) - dist_amount * 0.5 * (out ** 3)
+        out = np.clip(out, -1.0, 1.0).astype(np.float32)
 
-    # 4. Receiving MEMS microphone response (wider than speaker, slight mid-boost)
-    mic_lo = random.uniform(180.0, 280.0)
-    mic_hi = random.uniform(4000.0, 4800.0)
-    b_hp2, a_hp2 = signal.butter(2, mic_lo / nyq, btype="high")
-    b_lp2, a_lp2 = signal.butter(3, mic_hi / nyq, btype="low")
-    out = signal.filtfilt(b_hp2, a_hp2, out).astype(np.float32)
-    out = signal.filtfilt(b_lp2, a_lp2, out).astype(np.float32)
+        # 3. Short room impulse (small to medium room: 0.05–0.25 s RT60)
+        rt60 = random.uniform(0.05, 0.25)
+        n_rir = max(int(rt60 * sr), 16)
+        t_rir = np.linspace(0, rt60, n_rir, endpoint=False)
+        rir = np.zeros(n_rir, dtype=np.float32)
+        direct_idx = int(0.002 * sr)
+        if direct_idx < n_rir:
+            rir[direct_idx] = 1.0
+        for delay_ms in [5, 9, 14, 20]:
+            idx = int(delay_ms * sr / 1000)
+            if idx < n_rir:
+                rir[idx] = random.uniform(0.05, 0.25) * random.choice([-1, 1])
+        decay = np.exp(-6.908 * t_rir / rt60)
+        rir += np.random.randn(n_rir).astype(np.float32) * 0.01 * decay
+        rir_max = np.abs(rir).max()
+        if rir_max > 1e-8:
+            rir /= rir_max
+        out = signal.fftconvolve(out, rir, mode="full")[:len(wav)].astype(np.float32)
 
-    # 5. AGC: compresses dynamic range (attack fast, release slow)
-    frame_len = int(0.02 * sr)  # 20ms frames
-    target_rms = 0.08
-    agc_out = np.zeros_like(out)
-    gain = 1.0
-    for i in range(0, len(out), frame_len):
-        frame = out[i:i + frame_len]
-        rms = np.sqrt(np.mean(frame ** 2) + 1e-10)
-        desired_gain = target_rms / rms if rms > 1e-6 else gain
-        # Smooth gain (attack=0.1 frame, release=0.5 frame)
-        alpha = 0.1 if desired_gain < gain else 0.5
-        gain = alpha * desired_gain + (1 - alpha) * gain
-        gain = np.clip(gain, 0.1, 8.0)
-        agc_out[i:i + frame_len] = frame * gain
-    out = agc_out.astype(np.float32)
+        # 4. Receiving MEMS microphone response (wider than speaker, slight mid-boost)
+        mic_lo = random.uniform(180.0, 280.0)
+        mic_hi = random.uniform(4000.0, 4800.0)
+        b_hp2, a_hp2 = signal.butter(2, mic_lo / nyq, btype="high")
+        b_lp2, a_lp2 = signal.butter(3, mic_hi / nyq, btype="low")
+        out = signal.filtfilt(b_hp2, a_hp2, out).astype(np.float32)
+        out = signal.filtfilt(b_lp2, a_lp2, out).astype(np.float32)
 
-    # 6. Ambient noise: fan/crowd/handling noise (SNR 14–28 dB)
-    snr_db = random.uniform(14.0, 28.0)
-    sig_power = np.mean(out ** 2) + 1e-10
-    noise_power = sig_power / (10 ** (snr_db / 10))
-    # Mix white noise with some pink tint for realism
-    white = np.random.randn(len(out)).astype(np.float32)
-    # Rough pink tint: simple IIR
-    b_pink = np.array([0.049922, -0.095993, 0.050612, -0.004408])
-    a_pink = np.array([1.0, -2.494956, 2.017265, -0.522949])
-    pink = signal.lfilter(b_pink, a_pink, white).astype(np.float32)
-    pink_rms = np.sqrt(np.mean(pink ** 2) + 1e-10)
-    out += pink * (np.sqrt(noise_power) / pink_rms)
+        # 5. AGC: compresses dynamic range (attack fast, release slow)
+        frame_len = max(int(0.02 * sr), 1)  # 20ms frames
+        target_rms = 0.08
+        agc_out = np.zeros_like(out)
+        gain = 1.0
+        for i in range(0, len(out), frame_len):
+            frame = out[i:i + frame_len]
+            rms = float(np.sqrt(np.mean(frame ** 2) + 1e-10))
+            desired_gain = target_rms / rms if rms > 1e-6 else gain
+            desired_gain = float(np.clip(desired_gain, 0.1, 8.0))
+            alpha = 0.1 if desired_gain < gain else 0.5
+            gain = alpha * desired_gain + (1 - alpha) * gain
+            agc_out[i:i + frame_len] = frame * gain
+        out = agc_out.astype(np.float32)
 
-    # 7. Codec simulation (G.711 phone call or 16kbps Opus messenger audio)
-    codec_choice = random.choice(["g711", "opus_16", "none"])
-    if codec_choice == "g711":
-        out = _apply_codec_g711(out, sr)
-    elif codec_choice == "opus_16":
-        out = _apply_codec_opus(out, sr, bitrate=16)
+        # 6. Ambient noise: low-pass filtered white noise (stable, ~fan/room hiss)
+        #    We use a simple first-order Butterworth LP at 2 kHz — guaranteed stable
+        #    at any sample rate. Avoids the IIR instability of 44.1kHz pink filters.
+        snr_db = random.uniform(14.0, 28.0)
+        sig_power = float(np.mean(out ** 2)) + 1e-10
+        noise_power = sig_power / (10 ** (snr_db / 10))
+        white = np.random.randn(len(out)).astype(np.float32)
+        # Stable simple LP at 2 kHz to tint noise warm/roomy
+        noise_cutoff = min(2000.0 / nyq, 0.99)
+        b_n, a_n = signal.butter(1, noise_cutoff, btype="low")
+        tinted = signal.lfilter(b_n, a_n, white).astype(np.float32)
+        tinted_rms = float(np.sqrt(np.mean(tinted ** 2) + 1e-10))
+        out += tinted * (np.sqrt(noise_power) / tinted_rms)
 
-    # Final normalize
-    mx = np.abs(out).max()
-    if mx > 1e-6:
-        out = out / mx * 0.90
-    return out.astype(np.float32)
+        # 7. Codec simulation (G.711 phone call or 16kbps Opus messenger audio)
+        codec_choice = random.choice(["g711", "opus_16", "none"])
+        if codec_choice == "g711":
+            out = _apply_codec_g711(out, sr)
+        elif codec_choice == "opus_16":
+            out = _apply_codec_opus(out, sr, bitrate=16)
+
+        # Final normalize + NaN/Inf guard
+        out = np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+        mx = np.abs(out).max()
+        if mx > 1e-6:
+            out = out / mx * 0.90
+        return out
+
+    except Exception as e:
+        # Safety net: if any stage produces NaN/Inf or crashes, return the original
+        # (normalized) waveform so no NaN ever enters the feature extractor.
+        import logging
+        logging.getLogger("train_modern").warning(
+            "apply_mobile_replay_chain failed (%s) — returning original wav", e
+        )
+        safe = np.nan_to_num(wav, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+        mx = np.abs(safe).max()
+        return (safe / mx * 0.90) if mx > 1e-6 else safe
 
 
 # ---------------------------------------------------------------------------
