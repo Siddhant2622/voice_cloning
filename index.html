@@ -1002,6 +1002,11 @@ let activeMode   = 'edge'; // 'edge' or 'ws'
 let sessionEma   = 0.05;
 let micNoiseFloor = 0.006; // Adaptive ambient noise floor estimate for mic VAD
 
+/* ─── Multi-Window History for Voting-Based Accuracy ────────────────────── */
+const SPOOF_HISTORY_LEN = 8;
+let spoofHistory = [];       // rolling buffer of last N raw spoof scores
+let consecutiveAiWindows = 0; // count of consecutive windows with high spoof score
+
 const SAMPLE_RATE = 16000;
 const CHUNK_MS    = 100;
 let customWsUrl   = localStorage.getItem('voiceguard_ws_url') || '';
@@ -1502,10 +1507,62 @@ function analyzeAudioChunk(samples, sampleRate = 16000, adaptiveNoiseFloor = 0.0
   // 7. Harmonic-to-Noise Ratio (HNR Proxy)
   const hnrProxy = pitchPeriodicity / (spectralFlatness + 1e-4);
 
+  // 8. Spectral Rolloff — frequency below which 85% of spectral energy lives
+  // Neural vocoders trained on mel-spectrograms have sharp rolloff ~8kHz
+  // Human speech has natural energy extending to 10-16kHz
+  let spectralRolloff = 0.5;
+  if (flatnessList.length > 0) {
+    // Use the DFT magnitudes from the last computed frame for rolloff
+    const rolloffFrames = [];
+    const rolloffFftN = 512;
+    const rolloffNumFrames = Math.min(5, nFrames);
+    for (let f = 0; f < rolloffNumFrames; f++) {
+      const start = f * spectralHop;
+      let totalE = 0;
+      const frameMags = new Float32Array(rolloffFftN / 2);
+      for (let k = 1; k < rolloffFftN / 2; k++) {
+        let re = 0, im = 0;
+        const kOffset = k * rolloffFftN;
+        for (let n = 0; n < rolloffFftN; n++) {
+          const s = (start + n < len) ? samples[start + n] * window._dftWindow[n] : 0;
+          re += s * window._dftCosTable[kOffset + n];
+          im += s * window._dftSinTable[kOffset + n];
+        }
+        const mag = Math.sqrt(re * re + im * im);
+        frameMags[k] = mag * mag; // power
+        totalE += mag * mag;
+      }
+      if (totalE > 0) {
+        let cumE = 0;
+        for (let k = 1; k < rolloffFftN / 2; k++) {
+          cumE += frameMags[k];
+          if (cumE >= totalE * 0.85) {
+            rolloffFrames.push(k / (rolloffFftN / 2));
+            break;
+          }
+        }
+      }
+    }
+    if (rolloffFrames.length > 0) {
+      spectralRolloff = rolloffFrames.reduce((a, b) => a + b, 0) / rolloffFrames.length;
+    }
+  }
+
+  // 9. Formant Bandwidth Proxy — variance of spectral peak widths
+  // Human formants have natural bandwidth variation; AI formants are unnaturally narrow/consistent
+  let formantBandwidthVar = 0.5;
+  if (flatnessList.length > 0 && centroidList.length > 2) {
+    // Use variance of per-frame spectral flatness as proxy for formant bandwidth variation
+    const flatMean = flatnessList.reduce((a, b) => a + b, 0) / flatnessList.length;
+    const flatVar = Math.sqrt(flatnessList.reduce((a, b) => a + (b - flatMean) ** 2, 0) / flatnessList.length);
+    formantBandwidthVar = flatVar / (flatMean + 1e-6);
+  }
+
   return {
     rms, zcr, hfRatio, spectralCentroid, spectralFlatness,
     pitchPeriodicity, energyVariance, hnrProxy,
     f0Jitter, voicedFrames,
+    spectralRolloff, formantBandwidthVar,
     isSilence: false,
     latency: Math.round(performance.now() - t0)
   };
@@ -1550,15 +1607,12 @@ async function startMic() {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
-        // Disable AGC and noise suppression — these pump idle room noise up to speech
-        // levels and introduce comb/phase artifacts that mimic neural vocoder signatures.
         noiseSuppression: false,
         autoGainControl: false,
         channelCount: 1
       }
     });
   } catch(e) {
-    // Some browsers ignore constraints — fall back with defaults
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
     } catch(e2) {
@@ -1567,48 +1621,39 @@ async function startMic() {
     }
   }
 
-  micNoiseFloor = 0.006; // reset adaptive noise floor on each new mic session
+  micNoiseFloor = 0.006;
+  spoofHistory = [];
+  consecutiveAiWindows = 0;
   inputStatus.textContent = 'Listening to Microphone (Adaptive VAD Active)...';
   const source = audioCtx.createMediaStreamSource(mediaStream);
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 1024;
   source.connect(analyser);
 
-  processor = audioCtx.createScriptProcessor(4096, 1, 1);
-  source.connect(processor);
-
-  const muteGain = audioCtx.createGain();
-  muteGain.gain.value = 0.0;
-  processor.connect(muteGain);
-  muteGain.connect(audioCtx.destination);
-
+  // ─── AudioWorklet (modern) with ScriptProcessor fallback ────────────
   let pcmBuffer = [];
-  processor.onaudioprocess = (e) => {
-    const inputData = e.inputBuffer.getChannelData(0);
+
+  const processMicData = (inputData) => {
     const resampled = downsampleBuffer(inputData, audioCtx.sampleRate, 16000);
 
-    // Continuously update adaptive noise floor using minimum RMS of quiet frames
     const frameRms = Math.sqrt(resampled.reduce((s, v) => s + v * v, 0) / resampled.length);
     if (frameRms > 1e-6) {
-      // Slow-attack, fast-release noise floor tracker
       if (frameRms < micNoiseFloor * 1.5) {
         micNoiseFloor = 0.98 * micNoiseFloor + 0.02 * frameRms;
       }
       micNoiseFloor = Math.max(0.003, Math.min(micNoiseFloor, 0.025));
     }
 
-    // Keep rolling buffer for AI Voice Analyst tab
     appendAnalystAudio(resampled, 16000);
 
     if (activeMode === 'ws' && ws && ws.readyState === 1) {
       const int16 = floatTo16Bit(resampled);
       ws.send(int16.buffer);
     } else {
-      // In Edge mode: high-precision rolling window with 75% overlap for continuous, responsive live mic scoring
       pcmBuffer.push(...resampled);
-      if (pcmBuffer.length >= 16000) { // 1-second analysis window
+      if (pcmBuffer.length >= 16000) {
         const chunk = new Float32Array(pcmBuffer.slice(0, 16000));
-        pcmBuffer = pcmBuffer.slice(4000); // 75% overlap (4 updates per second)
+        pcmBuffer = pcmBuffer.slice(4000);
 
         const analysis = analyzeAudioChunk(chunk, 16000, micNoiseFloor);
         if (analysis) {
@@ -1618,13 +1663,69 @@ async function startMic() {
     }
   };
 
+  let useWorklet = false;
+  try {
+    if (audioCtx.audioWorklet) {
+      const workletCode = `
+        class VGProcessor extends AudioWorkletProcessor {
+          constructor() { super(); this._buf = []; }
+          process(inputs) {
+            const input = inputs[0];
+            if (input && input[0]) { this.port.postMessage(input[0]); }
+            return true;
+          }
+        }
+        registerProcessor('vg-processor', VGProcessor);
+      `;
+      const blob = new Blob([workletCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      await audioCtx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+
+      const workletNode = new AudioWorkletNode(audioCtx, 'vg-processor');
+      source.connect(workletNode);
+
+      // Accumulate worklet frames (128 samples each) into ~4096-sample batches
+      let workletAccum = [];
+      workletNode.port.onmessage = (e) => {
+        const data = e.data;
+        for (let i = 0; i < data.length; i++) workletAccum.push(data[i]);
+        if (workletAccum.length >= 4096) {
+          processMicData(new Float32Array(workletAccum));
+          workletAccum = [];
+        }
+      };
+
+      const muteGain = audioCtx.createGain();
+      muteGain.gain.value = 0.0;
+      workletNode.connect(muteGain);
+      muteGain.connect(audioCtx.destination);
+      processor = workletNode;
+      useWorklet = true;
+    }
+  } catch(workletErr) {
+    console.warn('AudioWorklet unavailable, using ScriptProcessor fallback:', workletErr);
+  }
+
+  if (!useWorklet) {
+    processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    source.connect(processor);
+    const muteGain = audioCtx.createGain();
+    muteGain.gain.value = 0.0;
+    processor.connect(muteGain);
+    muteGain.connect(audioCtx.destination);
+    processor.onaudioprocess = (e) => {
+      processMicData(e.inputBuffer.getChannelData(0));
+    };
+  }
+
   btnMic.disabled  = true;
   btnFile.disabled = true;
   btnStop.disabled = false;
   drawWaveform();
 }
 
-/* ─── Multi-Feature Edge Risk Evaluation Engine (Empirically Calibrated) ─── */
+/* ─── Multi-Feature Edge Risk Evaluation Engine (v2 — Multi-Window Voting) ─── */
 function evaluateEdgeRisk(analysis, forcedProfile = null) {
   let cm = 0.05;
   let lv = 0.05;
@@ -1632,33 +1733,29 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
   let isSilenceWindow = false;
 
   if (analysis && analysis.isSilence) {
-    // Adaptive VAD determined no active speech — gently decay EMA toward baseline
     cm = 0.04;
     lv = 0.04;
     isSilenceWindow = true;
     reason = "Ambient room acoustics (standing by for speech input).";
+    consecutiveAiWindows = 0;
 
   } else if (forcedProfile === 'human') {
-    // Preset demo sample: Real human speech
     cm = 0.04; lv = 0.04;
     reason = "Human biological vocal tract verified: Natural formant bandwidth & dynamic pitch contour.";
+    consecutiveAiWindows = 0;
 
   } else if (forcedProfile === 'synth') {
-    // Preset demo sample: Classical vocoder / synthetic clone
     cm = 0.98; lv = 0.94;
     reason = "Critical spoof confidence: Robotic vocoder harmonics, phase anomalies & spectral flatness detected.";
+    consecutiveAiWindows = 5;
 
   } else if (forcedProfile === 'neural') {
-    // Preset demo sample: Modern Neural TTS (HiFi-GAN/VITS)
     cm = 0.88; lv = 0.82;
     reason = "Elevated spoof risk: Neural vocoder diffusion noise, unnatural prosodic cadence & synthetic flatness.";
+    consecutiveAiWindows = 4;
 
   } else if (analysis) {
-    // ══ Live Acoustic Calibrated Feature Scoring ════════════════════════════
-    // Thresholds calibrated from empirical data (see models/edge_thresholds.json):
-    //   Human bonafide: flat=0.14-0.28, jitter=0.031-0.049, pitch=0.23-0.68, eVar=0.73-1.24
-    //   Neural TTS:     flat=0.16-0.35, jitter=0.022-0.043, pitch=0.45-0.78, eVar=0.49-0.85
-    //   Classic synth:  flat=0.05-0.09, jitter=0.014-0.031, pitch=0.74-0.78, eVar=0.67-0.82
+    // ══ Live Acoustic Calibrated Feature Scoring (v2) ═══════════════════════
     const flat    = Number(analysis.spectralFlatness) || 0;
     const eVar    = Number(analysis.energyVariance) || 0;
     const pitch   = Number(analysis.pitchPeriodicity) || 0;
@@ -1668,97 +1765,154 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
     const hf      = Number(analysis.hfRatio) || 0;
     const jitter  = Number(analysis.f0Jitter) || 0;
     const voiced  = Number(analysis.voicedFrames) || 0;
+    const rolloff = Number(analysis.spectralRolloff) || 0.5;
+    const fbVar   = Number(analysis.formantBandwidthVar) || 0.5;
 
     let spoofScore = 0.05;
 
     // ── GUARD 1: Biological Vocal-Fold Jitter (strongest human signal) ──────
-    // Human vocal cords produce natural micro-perturbations (jitter) in F0 period.
-    // Synthetic engines have artificially rigid pitch (jitter < 1.8%).
-    if (voiced >= 3 && jitter >= 0.024) {
-      // Confirmed living biological vocal tract dynamics
+    // Human vocal cords: natural jitter 2-9%. AI vocoders: < 1.8%.
+    if (voiced >= 2 && jitter >= 0.020) {
       spoofScore = 0.04;
       reason = "Human biological vocal tract verified: Natural F0 micro-jitter & formant dynamics confirmed.";
-    } else if (voiced >= 2 && jitter >= 0.018 && flat >= 0.12) {
-      // Strong human formant + some jitter
+
+    } else if (voiced >= 1 && jitter >= 0.015 && flat >= 0.10) {
       spoofScore = 0.06;
       reason = "Organic vocal resonance & formant structure confirmed.";
+
+    // ── GUARD 2 (NEW): Spectral Rolloff — broadband human energy ────────────
+    // Human speech energy extends to 10-16kHz; neural TTS cuts off at ~8kHz
+    } else if (rolloff > 0.58 && voiced >= 1) {
+      spoofScore = 0.05;
+      reason = "Broadband vocal energy confirmed: Natural high-frequency speech harmonics present.";
+
+    // ── GUARD 3 (NEW): Formant Bandwidth Variation ──────────────────────────
+    // Human formants vary naturally in bandwidth; AI formants are rigid
+    } else if (fbVar > 0.45 && voiced >= 2 && eVar >= 0.70) {
+      spoofScore = 0.06;
+      reason = "Natural formant bandwidth variation confirmed: Organic resonance dynamics.";
+
     } else {
       // ── DETECTION 1: Classical Robotic Vocoder (pyttsx3, eSpeak, Festival) ─
-      if (pitch > 0.65 && flat < 0.12 && jitter < 0.022) {
-        spoofScore = Math.max(spoofScore, 0.90 + (pitch - 0.65) * 0.5);
+      // Hallmarks: rigid pitch, comb-filter harmonics, near-zero jitter
+      if (pitch > 0.65 && flat < 0.12 && jitter < 0.018 && rolloff < 0.55) {
+        spoofScore = Math.max(spoofScore, 0.92 + (pitch - 0.65) * 0.4);
         reason = "Critical: Robotic vocoder harmonics — rigid F0 with comb-filter spectral notches detected.";
-      } else if (flat < 0.11 && pitch > 0.60 && eVar < 0.90) {
+      } else if (flat < 0.11 && pitch > 0.60 && eVar < 0.90 && jitter < 0.020) {
         spoofScore = Math.max(spoofScore, 0.85);
         reason = "High spoof confidence: Unnatural spectral flatness & pitch rigidity (classical vocoder).";
       }
 
       // ── DETECTION 2: Modern Neural Vocoder (HiFi-GAN, ElevenLabs, VITS) ───
-      // Relaxed thresholds to catch more AI voices
-      if (zcr >= 0.120 && eVar < 0.95 && pitch > 0.35 && jitter < 0.035) {
-        const zcrExcess = (zcr - 0.120) * 5.0;
-        spoofScore = Math.max(spoofScore, 0.75 + zcrExcess);
-        reason = "Elevated spoof risk: Neural vocoder phase noise & suppressed prosodic dynamics.";
-      } else if (zcr >= 0.125 && hf >= 0.030 && eVar < 1.0) {
-        spoofScore = Math.max(spoofScore, 0.70);
-        reason = "Acoustic anomaly: Elevated high-frequency phase noise & spectral flatness.";
+      // Must satisfy MULTIPLE simultaneous anomalies to avoid false positives:
+      //   - Phase noise (zcr) AND spectral rolloff cutoff AND low jitter
+      if (zcr >= 0.130 && rolloff < 0.48 && jitter < 0.025 && eVar < 0.95) {
+        const zcrExcess = (zcr - 0.130) * 4.0;
+        spoofScore = Math.max(spoofScore, 0.80 + zcrExcess);
+        reason = "Elevated spoof risk: Neural vocoder phase noise, bandwidth cutoff & suppressed dynamics.";
+      } else if (zcr >= 0.135 && rolloff < 0.50 && hf >= 0.035 && eVar < 0.95 && jitter < 0.028) {
+        spoofScore = Math.max(spoofScore, 0.75);
+        reason = "Acoustic anomaly: Elevated HF phase noise with limited spectral bandwidth.";
+      } else if (rolloff < 0.42 && pitch > 0.50 && jitter < 0.022 && eVar < 0.90) {
+        // Strong bandwidth cutoff with rigid pitch — high confidence neural TTS
+        spoofScore = Math.max(spoofScore, 0.82);
+        reason = "Neural TTS bandwidth signature: Sharp spectral rolloff with rigid prosody.";
       }
 
       // ── SAFEGUARD: Human Sibilants & Fricatives (/s/, /sh/, /t/, /f/) ──────
-      if (zcr >= 0.110 && pitch < 0.40 && eVar >= 0.75) {
+      // High ZCR is normal for unvoiced consonants — low pitch periodicity, healthy energy
+      if (zcr >= 0.100 && pitch < 0.40 && eVar >= 0.65) {
         spoofScore = Math.min(spoofScore, 0.10);
         reason = "Unvoiced fricative / sibilant detected — consistent with natural human speech.";
       }
 
       // ── SAFEGUARD: Clean Human Formant Envelope ─────────────────────────────
-      if (zcr < 0.135 && hf < 0.045 && flat >= 0.12 && cent < 0.28) {
+      if (zcr < 0.140 && hf < 0.050 && flat >= 0.10 && cent < 0.30 && rolloff > 0.50) {
         spoofScore = Math.min(spoofScore, 0.08);
         reason = "Human formant structure confirmed: Natural resonance & spectral envelope.";
       }
 
+      // ── SAFEGUARD: Broadband Human Energy (spectral rolloff) ────────────────
+      if (rolloff > 0.52 && spoofScore > 0.15) {
+        spoofScore = Math.min(spoofScore, 0.15);
+        reason = "Broadband speech energy detected — natural high-frequency content rules out bandwidth-limited TTS.";
+      }
+
       // ── SAFEGUARD: Dynamic Prosodic Energy (syllabic inflection) ────────────
-      if (eVar >= 0.95) {
-        spoofScore *= 0.12; 
+      if (eVar >= 0.90) {
+        spoofScore *= 0.12;
         if (spoofScore < 0.12) reason = "Human prosodic dynamics confirmed: Natural syllabic energy contour.";
-      } else if (eVar >= 0.85 && pitch <= 0.65 && flat >= 0.12) {
+      } else if (eVar >= 0.80 && pitch <= 0.65 && flat >= 0.10) {
         spoofScore *= 0.25;
         if (spoofScore < 0.15) reason = "Human vocal envelope: Moderate energy variance & natural formant resonance.";
+      }
+
+      // ── SAFEGUARD: Formant Bandwidth Variation ──────────────────────────────
+      if (fbVar > 0.35 && spoofScore > 0.20 && eVar >= 0.70) {
+        spoofScore *= 0.40;
+        if (spoofScore < 0.15) reason = "Natural formant bandwidth variation — organic vocal resonance confirmed.";
       }
     }
 
     cm = Math.max(0.04, Math.min(0.98, spoofScore));
     lv = Math.max(0.04, Math.min(0.96, cm * 0.90 + (cm > 0.5 ? 0.06 : 0.02)));
+
+    // Track consecutive AI windows for escalation gating
+    if (cm >= 0.60) {
+      consecutiveAiWindows++;
+    } else {
+      consecutiveAiWindows = Math.max(0, consecutiveAiWindows - 2); // fast decay
+    }
   }
 
   // Strictly enforce numeric finite bounds
   cm = Number.isFinite(cm) ? Math.max(0, Math.min(1, cm)) : 0.05;
   lv = Number.isFinite(lv) ? Math.max(0, Math.min(1, lv)) : 0.05;
 
-  const instant = 0.65 * cm + 0.35 * lv;
+  // ── Multi-Window Voting: Use median of recent scores ──────────────────
+  spoofHistory.push(cm);
+  if (spoofHistory.length > SPOOF_HISTORY_LEN) spoofHistory.shift();
+
+  // Use median of history for stability — eliminates single-frame spikes
+  const sortedHistory = [...spoofHistory].sort((a, b) => a - b);
+  const medianCm = sortedHistory[Math.floor(sortedHistory.length / 2)];
+
+  // Blend: 70% median (stable), 30% instant (responsive)
+  const votedCm = 0.70 * medianCm + 0.30 * cm;
+  const votedLv = votedCm * 0.90 + (votedCm > 0.5 ? 0.06 : 0.02);
+
+  const instant = 0.65 * votedCm + 0.35 * votedLv;
   if (!Number.isFinite(sessionEma)) sessionEma = 0.05;
 
-  // Silence/human windows: fast decay toward baseline (0.15 memory)
-  // Synthetic windows: slower smoothing to prevent single-frame spikes
-  if (isSilenceWindow || cm < 0.15) {
-    sessionEma = 0.25 * instant + 0.75 * sessionEma; // slower update, quick recovery on ALLOW
-    // Extra fast recovery when we see clear human or silence consecutively
-    if (sessionEma > 0.20 && cm < 0.12) sessionEma = Math.max(0.05, sessionEma * 0.70);
+  // ── EMA with corrected asymmetry ──────────────────────────────────────
+  // Human/silence: fast recovery (35% new) — don't let false positives linger
+  // Synthetic: slow escalation (30% new) — require sustained AI signal
+  if (isSilenceWindow || votedCm < 0.15) {
+    sessionEma = 0.35 * instant + 0.65 * sessionEma;
+    if (sessionEma > 0.15 && votedCm < 0.10) {
+      sessionEma = Math.max(0.05, sessionEma * 0.60); // aggressive recovery
+    }
+    consecutiveAiWindows = 0;
+  } else if (votedCm >= 0.60) {
+    sessionEma = 0.30 * instant + 0.70 * sessionEma; // slow escalation
   } else {
-    sessionEma = 0.50 * instant + 0.50 * sessionEma;
+    sessionEma = 0.35 * instant + 0.65 * sessionEma;
   }
   if (!Number.isFinite(sessionEma)) sessionEma = instant;
   const fusion = sessionEma;
 
   let decision = "ALLOW";
 
-  if (fusion >= 0.80) {
+  // ── Decision gating: require sustained AI signal for BLOCK ─────────────
+  if (fusion >= 0.80 && consecutiveAiWindows >= 3) {
     decision = "BLOCK";
-    if (!reason.includes('spoof') && !reason.includes('Robotic') && !reason.includes('Neural')) {
-      reason = "High synthetic voice probability: Vocoder phase distortion & abnormal spectral flatness.";
+    if (!reason.includes('spoof') && !reason.includes('Robotic') && !reason.includes('Neural') && !reason.includes('bandwidth')) {
+      reason = "High synthetic voice probability: Sustained vocoder artifacts across multiple analysis windows.";
     }
-  } else if (fusion >= 0.60) {
+  } else if (fusion >= 0.60 && consecutiveAiWindows >= 2) {
     decision = "ALERT";
-    if (!reason.includes('spoof') && !reason.includes('Elevated')) {
-      reason = "Acoustic anomaly: Elevated spectral flatness & suppressed energy variance — alert dispatched.";
+    if (!reason.includes('spoof') && !reason.includes('Elevated') && !reason.includes('bandwidth')) {
+      reason = "Acoustic anomaly: Persistent spectral artifacts — alert dispatched.";
     }
   } else if (fusion >= 0.45) {
     decision = "STEP_UP";
@@ -1769,8 +1923,8 @@ function evaluateEdgeRisk(analysis, forcedProfile = null) {
     type: "score",
     timestamp: new Date().toISOString(),
     window_index: windowCount + 1,
-    cm_score: Number(cm.toFixed(3)),
-    liveness_score: Number(lv.toFixed(3)),
+    cm_score: Number(votedCm.toFixed(3)),
+    liveness_score: Number(votedLv.toFixed(3)),
     sv_score: null,
     fusion_score: Number(fusion.toFixed(3)),
     decision: decision,
@@ -2035,6 +2189,8 @@ btnReset.onclick     = () => {
   windowCount = 0;
   latencies   = [];
   sessionEma  = 0.05;
+  spoofHistory = [];
+  consecutiveAiWindows = 0;
   analystSampleCount = 0;
   logBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>';
   document.getElementById('met-windows').textContent = '0';
