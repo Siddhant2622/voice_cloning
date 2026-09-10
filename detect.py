@@ -187,9 +187,12 @@ def main() -> int:
     features = extract_all(waveform, device=device)
 
     # ── Step 3: CM scoring ─────────────────────────────────────────────────
-    cm_ckpt = args.model or (
-        "models/cm.pt" if Path("models/cm.pt").exists() else None
-    )
+    cm_ckpt = args.model
+    if not cm_ckpt:
+        for candidate in ["models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
+            if Path(candidate).exists():
+                cm_ckpt = candidate
+                break
     cm_scorer = CMScorerWrapper(checkpoint_path=cm_ckpt, device=device)
     cm_score = cm_scorer.score(features)
 

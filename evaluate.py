@@ -283,8 +283,12 @@ def main():
         logger.error("No samples found. Check data directory and partition.")
         sys.exit(1)
 
-    # ── Score ────────────────────────────────────────────────────────────────
-    cm_ckpt     = args.cm_model if Path(args.cm_model).exists() else None
+    cm_ckpt = args.cm_model if Path(args.cm_model).exists() else None
+    if cm_ckpt is None:
+        for candidate in ["models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt"]:
+            if Path(candidate).exists():
+                cm_ckpt = candidate
+                break
     fusion_ckpt = args.fusion_model if Path(args.fusion_model).exists() else None
 
     logger.info("Scoring %d samples...", len(samples))

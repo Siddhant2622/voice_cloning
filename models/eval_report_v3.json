@@ -1,0 +1,263 @@
+{
+  "checkpoint": "models/cm_detect2b_v3.pt",
+  "data_dir": "data/modern_dataset",
+  "n_evaluated": 142,
+  "n_errors": 0,
+  "overall": {
+    "eer_percent": 0.0,
+    "eer_threshold": 0.9536,
+    "accuracy_at_0.5": 100.0,
+    "bonafide_accuracy": 100.0,
+    "spoof_accuracy": 100.0
+  },
+  "per_source": {
+    "codec_g711": {
+      "n_samples": 24,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "codec_voip": {
+      "n_samples": 25,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_gb_libby": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_gb_maisie": {
+      "n_samples": 2,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_gb_sonia": {
+      "n_samples": 2,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_gb_thomas": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_ie_connor": {
+      "n_samples": 2,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_in_neerja": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_in_prabhat": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_us_andrew": {
+      "n_samples": 2,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_us_emma": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_us_guy": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_us_roger": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_en_us_steffan": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_es_es_alvaro": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_it_it_elsa": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_ja_jp_keita": {
+      "n_samples": 3,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_ja_jp_nanami": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_pt_br_antonio": {
+      "n_samples": 1,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "edge_tts_v1": {
+      "n_samples": 28,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "librispeech_dev_clean": {
+      "n_samples": 29,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    },
+    "replay_bonafide": {
+      "n_samples": 13,
+      "eer_percent": "N/A",
+      "accuracy_percent": 100.0
+    }
+  },
+  "per_tts_system": {
+    "au": {
+      "n_samples": 5,
+      "avg_score": 0.9958,
+      "detection_rate": 100.0
+    },
+    "ca": {
+      "n_samples": 5,
+      "avg_score": 0.9952,
+      "detection_rate": 100.0
+    },
+    "codec_g711": {
+      "n_samples": 24,
+      "avg_score": 0.996,
+      "detection_rate": 100.0
+    },
+    "codec_voip": {
+      "n_samples": 25,
+      "avg_score": 0.9953,
+      "detection_rate": 100.0
+    },
+    "en-GB-LibbyNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9947,
+      "detection_rate": 100.0
+    },
+    "en-GB-MaisieNeural": {
+      "n_samples": 2,
+      "avg_score": 0.9743,
+      "detection_rate": 100.0
+    },
+    "en-GB-SoniaNeural": {
+      "n_samples": 2,
+      "avg_score": 0.9961,
+      "detection_rate": 100.0
+    },
+    "en-GB-ThomasNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9961,
+      "detection_rate": 100.0
+    },
+    "en-IE-ConnorNeural": {
+      "n_samples": 2,
+      "avg_score": 0.9895,
+      "detection_rate": 100.0
+    },
+    "en-IN-NeerjaNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9962,
+      "detection_rate": 100.0
+    },
+    "en-IN-PrabhatNeural": {
+      "n_samples": 1,
+      "avg_score": 0.996,
+      "detection_rate": 100.0
+    },
+    "en-US-AndrewNeural": {
+      "n_samples": 2,
+      "avg_score": 0.9947,
+      "detection_rate": 100.0
+    },
+    "en-US-EmmaNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9956,
+      "detection_rate": 100.0
+    },
+    "en-US-GuyNeural": {
+      "n_samples": 1,
+      "avg_score": 0.996,
+      "detection_rate": 100.0
+    },
+    "en-US-RogerNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9911,
+      "detection_rate": 100.0
+    },
+    "en-US-SteffanNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9949,
+      "detection_rate": 100.0
+    },
+    "es-ES-AlvaroNeural": {
+      "n_samples": 1,
+      "avg_score": 0.996,
+      "detection_rate": 100.0
+    },
+    "gb": {
+      "n_samples": 8,
+      "avg_score": 0.9959,
+      "detection_rate": 100.0
+    },
+    "human": {
+      "n_samples": 42,
+      "avg_score": 0.0269,
+      "detection_rate": "N/A"
+    },
+    "in": {
+      "n_samples": 5,
+      "avg_score": 0.9959,
+      "detection_rate": 100.0
+    },
+    "it-IT-ElsaNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9956,
+      "detection_rate": 100.0
+    },
+    "ja-JP-KeitaNeural": {
+      "n_samples": 3,
+      "avg_score": 0.9961,
+      "detection_rate": 100.0
+    },
+    "ja-JP-NanamiNeural": {
+      "n_samples": 1,
+      "avg_score": 0.9906,
+      "detection_rate": 100.0
+    },
+    "pt-BR-AntonioNeural": {
+      "n_samples": 1,
+      "avg_score": 0.996,
+      "detection_rate": 100.0
+    },
+    "us": {
+      "n_samples": 3,
+      "avg_score": 0.9953,
+      "detection_rate": 100.0
+    },
+    "v0": {
+      "n_samples": 2,
+      "avg_score": 0.9935,
+      "detection_rate": 100.0
+    }
+  },
+  "score_stats": {
+    "bonafide_mean": 0.0269,
+    "bonafide_std": 0.0588,
+    "spoof_mean": 0.995,
+    "spoof_std": 0.0045
+  }
+}

@@ -79,4 +79,6 @@ data/*.pt
 data/gdrive_link.txt
 
 
-.vercel
+data/modern_dataset/
+data/raw_downloads/
+data/modern_features_cache_*.pt

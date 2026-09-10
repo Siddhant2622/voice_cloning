@@ -1794,7 +1794,7 @@ async function startMic() {
       for (let i = 0; i < resampled.length; i++) pcmBuffer.push(resampled[i]);
       if (pcmBuffer.length >= 16000) {
         const chunk = new Float32Array(pcmBuffer.slice(0, 16000));
-        pcmBuffer = pcmBuffer.slice(4000);
+        pcmBuffer = pcmBuffer.slice(16000);
 
         const analysis = analyzeAudioChunk(chunk, 16000);
         if (analysis) {

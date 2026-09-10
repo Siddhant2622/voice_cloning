@@ -109,7 +109,11 @@ def _load_models():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Loading models on %s...", device)
 
-    cm_ckpt = "models/cm.pt" if Path("models/cm.pt").exists() else None
+    cm_ckpt = None
+    for candidate in ["models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
+        if Path(candidate).exists():
+            cm_ckpt = candidate
+            break
     _cm_scorer    = CMScorerWrapper(checkpoint_path=cm_ckpt, device=device)
     _lv_scorer    = LivenessScorer()
     _sv           = SpeakerVerifier(device=device)

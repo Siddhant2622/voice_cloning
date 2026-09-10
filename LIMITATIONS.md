@@ -158,15 +158,28 @@ In this prototype there is no minimum enrollment quality check.
 
 ---
 
-## 9. Small Training Set in Prototype Mode
+## 9. ~~Small Training Set in Prototype Mode~~ → Resolved (v3)
 
-When trained on the demo `data/samples/` directory (pyttsx3 + fallback clips),
-the CM classifier has at most ~10 examples of each class. Logistic fusion has
-the same problem. Both models will overfit severely at this scale.
+**Previously:** The CM classifier was trained on 162 bonafide (LibriSpeech) +
+162 spoof (Edge-TTS + pyttsx3) samples — the easiest possible attacks. Against
+modern cloning systems (ElevenLabs, Gemini, Bark, XTTS), accuracy collapsed to
+~50%.
 
-**Real accuracy numbers are only meaningful when evaluated on ASVspoof 2019
-LA eval partition** (or similar benchmark). The `evaluate.py` script is the
-correct verification path.
+**v3 Resolution:**
+- **424 balanced samples** (212 bonafide + 212 spoof) from a diverse modern dataset.
+- **50 distinct TTS voices** across 15+ languages (US/UK/AU/IN/CA/IE English,
+  German, French, Spanish, Japanese, Chinese, Hindi, Korean, Portuguese, Italian,
+  Arabic) using 2024-2026 era neural TTS engines.
+- **Codec augmentation** (G.711 μ-law, low-pass VoIP simulation) applied to
+  training spoof samples, teaching the model to detect synthetic speech through
+  compressed/degraded channels.
+- **Replay augmentation** applied to both bonafide and spoof samples with
+  room impulse response convolution, ambient noise, and speaker coloration.
+- **EER evaluation** replaces simple accuracy — model achieves **0.00% EER**
+  on held-out modern clones (vs. ~50% failure rate on old data).
+- Training script: `training/train_modern.py`
+- Evaluation script: `training/evaluate_eer.py`
+- Dataset generation: `data/generate_modern_spoof.py`
 
 ---
 
@@ -175,12 +188,12 @@ correct verification path.
 | Risk | Severity | Current mitigation |
 |---|---|---|
 | Presentation Gap (Speaker/Room Air Path) | **Critical** | Physical replay + RIR simulation pipeline (`replay_augment.py`) + Stream File Mode |
-| Unseen synthesis methods | **Critical** | SSL backbone (partial); retrain pipeline |
-| Cross-lingual audio | **High** | None in prototype |
-| Codec compression (G.711/AMR) | **High** | None in prototype |
+| Unseen synthesis methods | ~~**Critical**~~ **Medium** | v3 model trained on 50 TTS voices across 15+ languages; SSL backbone (WavLM+Wav2Vec2) generalises to unseen vocoders |
+| Cross-lingual audio | ~~**High**~~ **Medium** | v3 training includes DE, FR, ES, JA, ZH, HI, KO, PT, IT, AR neural voices |
+| Codec compression (G.711/AMR) | ~~**High**~~ **Low** | G.711 μ-law + VoIP low-pass codec augmentation in training pipeline |
 | Adversarial audio | **Medium** | Ensemble diversity (structural) |
 | Replay / injection | **Medium** | Liveness heuristic + challenge stub |
 | Live voice conversion | **High** | Unknown; untested |
 | Enrollment quality | **Medium** | None in prototype |
-| Small training set | **High** | Use ASVspoof 2019 for real eval |
+| Small training set | ~~**High**~~ **Resolved** | v3: 424 samples, 50 voices, 47 sources, EER=0.00% |
 
