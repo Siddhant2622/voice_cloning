@@ -1,0 +1,118 @@
+{
+  "dataset_folder_url": "https://drive.google.com/drive/folders/1B5xNpwBbyI8a_RyK86wAFCl82K-ExjNe",
+  "full_dataset_zip_url": "https://drive.google.com/uc?export=download&id=1LAptqF0jUu3r4xfm2vuZYPx2dn8mII9N",
+  "full_dataset_zip_id": "1LAptqF0jUu3r4xfm2vuZYPx2dn8mII9N",
+  "updated_at": "2026-09-10T09:37:39Z",
+  "samples": [
+    {
+      "id": "1lNCHfiHbhG-JfA8f0yqxT8i8pgr2ocpb",
+      "name": "human_librispeech_bonafide_studio.wav",
+      "title": "Bona Fide (Human)",
+      "type": "human",
+      "lang": "en-US",
+      "description": "Genuine Studio Human Speech (LibriSpeech clean reference)",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1lNCHfiHbhG-JfA8f0yqxT8i8pgr2ocpb",
+      "view_url": "https://drive.google.com/file/d/1lNCHfiHbhG-JfA8f0yqxT8i8pgr2ocpb/view?usp=sharing",
+      "size_bytes": 167004
+    },
+    {
+      "id": "1E8SxLHhdxVXWgy37RsQNzbH6vLe3FMlD",
+      "name": "spoof_neural_jenny_en_us.wav",
+      "title": "AI Clone: Jenny (US)",
+      "type": "synth",
+      "lang": "en-US",
+      "description": "Modern Neural TTS / Voice Clone (Female, US English)",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1E8SxLHhdxVXWgy37RsQNzbH6vLe3FMlD",
+      "view_url": "https://drive.google.com/file/d/1E8SxLHhdxVXWgy37RsQNzbH6vLe3FMlD/view?usp=sharing",
+      "size_bytes": 152108
+    },
+    {
+      "id": "1CZCL9g1RpdMIt8QtrL7dC6k001JrNNEA",
+      "name": "spoof_neural_guy_en_us.wav",
+      "title": "AI Clone: Guy (US)",
+      "type": "synth",
+      "lang": "en-US",
+      "description": "Modern Neural TTS / Voice Clone (Male, US English)",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1CZCL9g1RpdMIt8QtrL7dC6k001JrNNEA",
+      "view_url": "https://drive.google.com/file/d/1CZCL9g1RpdMIt8QtrL7dC6k001JrNNEA/view?usp=sharing",
+      "size_bytes": 143660
+    },
+    {
+      "id": "1g24Wc7nmKXfP-JQ5fO4WUTHFJppD70Dg",
+      "name": "spoof_neural_ryan_en_gb.wav",
+      "title": "AI Clone: Ryan (UK)",
+      "type": "synth",
+      "lang": "en-GB",
+      "description": "Modern British English Neural Voice Clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1g24Wc7nmKXfP-JQ5fO4WUTHFJppD70Dg",
+      "view_url": "https://drive.google.com/file/d/1g24Wc7nmKXfP-JQ5fO4WUTHFJppD70Dg/view?usp=sharing",
+      "size_bytes": 150572
+    },
+    {
+      "id": "1WxlEvTIhS5UyoD1VhmUNVMbi1FwedLzI",
+      "name": "spoof_multilingual_es_alvaro.wav",
+      "title": "AI Clone: Spanish",
+      "type": "synth",
+      "lang": "es-ES",
+      "description": "Modern Spanish Multilingual Neural Voice Clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1WxlEvTIhS5UyoD1VhmUNVMbi1FwedLzI",
+      "view_url": "https://drive.google.com/file/d/1WxlEvTIhS5UyoD1VhmUNVMbi1FwedLzI/view?usp=sharing",
+      "size_bytes": 141356
+    },
+    {
+      "id": "13MPfNy8m48dOkaHzqrrRn4G26EVo6jUf",
+      "name": "spoof_multilingual_fr_denise.wav",
+      "title": "AI Clone: French",
+      "type": "synth",
+      "lang": "fr-FR",
+      "description": "Modern French Multilingual Neural Voice Clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=13MPfNy8m48dOkaHzqrrRn4G26EVo6jUf",
+      "view_url": "https://drive.google.com/file/d/13MPfNy8m48dOkaHzqrrRn4G26EVo6jUf/view?usp=sharing",
+      "size_bytes": 142892
+    },
+    {
+      "id": "19QdzuQ3IohzHncrTrQDBdiwW-rtC58tk",
+      "name": "spoof_multilingual_hi_swara.wav",
+      "title": "AI Clone: Hindi",
+      "type": "synth",
+      "lang": "hi-IN",
+      "description": "Modern Hindi Multilingual Neural Voice Clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=19QdzuQ3IohzHncrTrQDBdiwW-rtC58tk",
+      "view_url": "https://drive.google.com/file/d/19QdzuQ3IohzHncrTrQDBdiwW-rtC58tk/view?usp=sharing",
+      "size_bytes": 160556
+    },
+    {
+      "id": "1_n4qs8JIQvEVgppUCX5buS2TFyftHsLw",
+      "name": "spoof_multilingual_ja_nanami.wav",
+      "title": "AI Clone: Japanese",
+      "type": "synth",
+      "lang": "ja-JP",
+      "description": "Modern Japanese Multilingual Neural Voice Clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1_n4qs8JIQvEVgppUCX5buS2TFyftHsLw",
+      "view_url": "https://drive.google.com/file/d/1_n4qs8JIQvEVgppUCX5buS2TFyftHsLw/view?usp=sharing",
+      "size_bytes": 208940
+    },
+    {
+      "id": "18gC1O2p09d-pLg3evZmhBjga_-KeTSGd",
+      "name": "spoof_telephony_g711_codec.wav",
+      "title": "Telephony Spoof (G.711)",
+      "type": "codec",
+      "lang": "en-US",
+      "description": "G.711 mu-law compressed telephony audio clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=18gC1O2p09d-pLg3evZmhBjga_-KeTSGd",
+      "view_url": "https://drive.google.com/file/d/18gC1O2p09d-pLg3evZmhBjga_-KeTSGd/view?usp=sharing",
+      "size_bytes": 162092
+    },
+    {
+      "id": "1v8a-4yAGhTa5wyqQ8iV6hOf9qae_bArP",
+      "name": "spoof_voip_telephone.wav",
+      "title": "VoIP Phone Spoof",
+      "type": "codec",
+      "lang": "en-US",
+      "description": "VoIP telephone channel compressed audio clone",
+      "direct_url": "https://drive.google.com/uc?export=download&id=1v8a-4yAGhTa5wyqQ8iV6hOf9qae_bArP",
+      "view_url": "https://drive.google.com/file/d/1v8a-4yAGhTa5wyqQ8iV6hOf9qae_bArP/view?usp=sharing",
+      "size_bytes": 160556
+    }
+  ]
+}

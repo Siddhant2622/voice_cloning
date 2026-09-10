@@ -610,16 +610,39 @@
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <div class="tab-pane active" id="tab-live" role="tabpanel">
 
-  <!-- Instant Sample Testing Presets -->
+  <!-- Google Drive Cloud Dataset & Sample Testing Presets -->
   <div class="preset-banner">
-    <div class="preset-title">
-      <span>&#9889; Instant Demo Samples:</span>
-      <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Test the detection pipeline with 1 click</span>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div class="preset-title">
+        <span style="color: var(--accent); display: flex; align-items: center; gap: 6px;">☁️ Google Drive Dataset:</span>
+        <span style="font-size: 11px; color: var(--green); font-weight: 500; background: rgba(46,221,155,0.12); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(46,221,155,0.3);">🟢 Cloud Synced</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted);">
+        Stream & test genuine vs modern neural clones directly from Google Drive
+      </div>
     </div>
-    <div class="preset-btns">
-      <button class="btn-preset" id="preset-human">&#128100; Genuine Human Voice</button>
-      <button class="btn-preset" id="preset-synth">&#129302; AI Voice Clone</button>
-      <button class="btn-preset" id="preset-neural">&#9889; Neural TTS</button>
+    <div class="preset-btns" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <button class="btn-preset" id="preset-human" title="Stream clean studio human voice from Google Drive">&#128100; Studio Human (Drive)</button>
+      <button class="btn-preset" id="preset-synth" title="Stream US Jenny neural clone from Google Drive">&#129302; Jenny AI Clone (Drive)</button>
+      <button class="btn-preset" id="preset-neural" title="Stream US Guy neural clone from Google Drive">&#9889; Guy AI Clone (Drive)</button>
+      
+      <select id="drive-sample-select" class="btn-preset" style="background: rgba(14,22,38,0.95); border-color: var(--accent); padding: 6px 12px; cursor: pointer; outline: none;">
+        <option value="" disabled selected>📂 More Drive Samples (10 Available)...</option>
+        <option value="1lNCHfiHbhG-JfA8f0yqxT8i8pgr2ocpb|human|Studio Human (LibriSpeech)">👤 Studio Human (LibriSpeech Clean)</option>
+        <option value="1E8SxLHhdxVXWgy37RsQNzbH6vLe3FMlD|synth|Jenny Neural Clone (US)">🤖 AI Clone: Jenny (US Female)</option>
+        <option value="1CZCL9g1RpdMIt8QtrL7dC6k001JrNNEA|synth|Guy Neural Clone (US)">🤖 AI Clone: Guy (US Male)</option>
+        <option value="1g24Wc7nmKXfP-JQ5fO4WUTHFJppD70Dg|synth|Ryan Neural Clone (UK)">🇬🇧 AI Clone: Ryan (UK English)</option>
+        <option value="1WxlEvTIhS5UyoD1VhmUNVMbi1FwedLzI|synth|Alvaro Neural Clone (ES)">🇪🇸 AI Clone: Alvaro (Spanish)</option>
+        <option value="13MPfNy8m48dOkaHzqrrRn4G26EVo6jUf|synth|Denise Neural Clone (FR)">🇫🇷 AI Clone: Denise (French)</option>
+        <option value="19QdzuQ3IohzHncrTrQDBdiwW-rtC58tk|synth|Swara Neural Clone (HI)">🇮🇳 AI Clone: Swara (Hindi)</option>
+        <option value="1_n4qs8JIQvEVgppUCX5buS2TFyftHsLw|synth|Nanami Neural Clone (JA)">🇯🇵 AI Clone: Nanami (Japanese)</option>
+        <option value="18gC1O2p09d-pLg3evZmhBjga_-KeTSGd|codec|G.711 Telephony Spoof">📞 Telephony Spoof (G.711 μ-law)</option>
+        <option value="1v8a-4yAGhTa5wyqQ8iV6hOf9qae_bArP|codec|VoIP Phone Spoof">📱 VoIP Channel Spoof</option>
+      </select>
+
+      <a href="https://drive.google.com/drive/folders/1B5xNpwBbyI8a_RyK86wAFCl82K-ExjNe" target="_blank" rel="noopener noreferrer" class="btn-preset" style="background: rgba(79,142,247,0.18); border-color: var(--accent); color: var(--accent); text-decoration: none;" title="Open Google Drive folder containing full 118 MB modern dataset + 322 MB LibriSpeech">
+        ☁️ Drive Folder &#8599;
+      </a>
     </div>
   </div>
 
@@ -1231,6 +1254,7 @@ const inputStatus    = document.getElementById('input-status');
 const presetHuman    = document.getElementById('preset-human');
 const presetSynth    = document.getElementById('preset-synth');
 const presetNeural   = document.getElementById('preset-neural');
+const driveSampleSelect = document.getElementById('drive-sample-select');
 
 // Settings modal
 const btnOpenSettings  = document.getElementById('btn-open-settings');
@@ -2225,9 +2249,78 @@ async function loadSampleUrl(url, profile) {
   }
 }
 
-presetHuman.onclick  = () => loadSampleUrl('/samples/human_sample.wav', 'human');
-presetSynth.onclick  = () => loadSampleUrl('/samples/synthetic_sample.wav', 'synth');
-presetNeural.onclick = () => loadSampleUrl('/samples/neural_tts_sample.wav', 'neural');
+/* ─── Google Drive Streaming & Playback ──────────────────────────────────── */
+async function loadDriveSample(fileId, profile, title) {
+  if (isAnalyzing) stopMic();
+  inputStatus.innerHTML = `<span style="color:var(--accent)">☁️ Fetching ${title} from Google Drive...</span>`;
+
+  let arrayBuf = null;
+  let lastError = null;
+
+  const candidateUrls = [
+    `/api/sample?id=${fileId}`,
+    `https://drive.google.com/uc?export=download&id=${fileId}`,
+    `https://docs.google.com/uc?export=download&id=${fileId}`
+  ];
+
+  for (const u of candidateUrls) {
+    try {
+      const res = await fetch(u);
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        if (buf && buf.byteLength > 2000) {
+          arrayBuf = buf;
+          break;
+        }
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (!arrayBuf) {
+    if (window.EMBEDDED_SAMPLES && window.EMBEDDED_SAMPLES[profile]) {
+      const dataUri = window.EMBEDDED_SAMPLES[profile];
+      const base64Data = dataUri.split(',')[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+      arrayBuf = bytes.buffer;
+    } else {
+      alert(`Could not stream sample from Google Drive: ${lastError ? lastError.message : 'Network error'}`);
+      inputStatus.textContent = 'Ready';
+      return;
+    }
+  }
+
+  try {
+    inputStatus.innerHTML = `<span style="color:var(--green)">⚡ Streamed from Google Drive: ${title}</span>`;
+    const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await tempCtx.decodeAudioData(arrayBuf);
+    tempCtx.close();
+    playAndAnalyzeAudio(decoded, profile);
+  } catch (err) {
+    alert(`Error decoding audio from Google Drive: ${err.message}`);
+    inputStatus.textContent = 'Ready';
+  }
+}
+
+presetHuman.onclick  = () => loadDriveSample('1lNCHfiHbhG-JfA8f0yqxT8i8pgr2ocpb', 'human', 'Studio Human (Drive)');
+presetSynth.onclick  = () => loadDriveSample('1E8SxLHhdxVXWgy37RsQNzbH6vLe3FMlD', 'synth', 'Jenny AI Clone (Drive)');
+presetNeural.onclick = () => loadDriveSample('1CZCL9g1RpdMIt8QtrL7dC6k001JrNNEA', 'synth', 'Guy AI Clone (Drive)');
+
+if (driveSampleSelect) {
+  driveSampleSelect.onchange = (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    const parts = val.split('|');
+    const fileId = parts[0];
+    const profile = parts[1] || 'synth';
+    const title = parts[2] || 'Drive Sample';
+    loadDriveSample(fileId, profile, title);
+    e.target.value = '';
+  };
+}
 
 /* ─── Waveform Visualizer ────────────────────────────────────────────────── */
 function drawWaveform() {
