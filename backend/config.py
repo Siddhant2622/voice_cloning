@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     debug:       bool = False
 
     # ── Model ──────────────────────────────────────────────────────────────
-    cm_checkpoint:  str = "models/cm_detect2b_v3.pt"
+    cm_checkpoint:  str = "models/cm_detect2b_v4.pt"
     hf_repo_id:     str = ""         # Pull checkpoint from HF Hub on startup
     hf_token:       str = ""
 

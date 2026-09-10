@@ -360,6 +360,7 @@ def _score_window(
             flatness_score=liveness_result.get("flatness_score"),
             jitter_score=liveness_result.get("jitter_score"),
             contrast_score=liveness_result.get("contrast_score"),
+            bandwidth_score=liveness_result.get("bandwidth_score"),
         )
         instant_fusion = _fusion_model.score(bundle)
 

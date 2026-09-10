@@ -52,6 +52,7 @@ class ScoreBundle:
     flatness_score:    Optional[float] = None
     jitter_score:      Optional[float] = None
     contrast_score:    Optional[float] = None
+    bandwidth_score:   Optional[float] = None
     # Watermark signal (Layer 2)
     watermark_detected: Optional[bool] = None
 
@@ -122,19 +123,28 @@ class FusionModel:
             ) / total_w
 
             # Biological liveness protection:
-            # Only suppress if BOTH signals strongly agree it's genuine human:
-            # cm_score < 0.50 (low confidence from CM) AND liveness < 0.15 (very clearly live).
-            # The old thresholds (< 0.70 / < 0.25) were too loose — they suppressed
-            # detection of AI voice that picked up natural room acoustics via a mobile mic.
-            if bundle.cm_score < 0.50 and bundle.liveness_score < 0.15:
+            # Only suppress if ALL signals strongly agree it's genuine human:
+            # cm_score < 0.40 AND liveness < 0.15 AND no mobile bandwidth rolloff.
+            if (
+                bundle.cm_score < 0.40
+                and bundle.liveness_score < 0.15
+                and (bundle.bandwidth_score is None or bundle.bandwidth_score < 0.20)
+            ):
                 human_confidence = 1.0 - (bundle.liveness_score / 0.15)
                 score = score * (1.0 - 0.20 * human_confidence)
 
             # High-confidence attack override:
-            # Lowered from 0.75 → 0.65 so a moderately-confident CM detection
-            # (cross-device AI voice may score 0.60–0.70) is not suppressed.
-            if bundle.cm_score >= 0.65:
-                score = max(score, bundle.cm_score * 0.92)
+            if bundle.cm_score >= 0.60:
+                score = max(score, bundle.cm_score * 0.94)
+
+            # Cross-device mobile speaker replay override:
+            # If bandwidth rolloff indicates mobile speaker playback (bandwidth_score >= 0.40)
+            if bundle.bandwidth_score is not None and bundle.bandwidth_score >= 0.40:
+                replay_confidence = min(1.0, (bundle.bandwidth_score - 0.40) / 0.40)
+                if bundle.cm_score >= 0.50:
+                    score = max(score, 0.78 + 0.18 * replay_confidence)
+                else:
+                    score = max(score, 0.65 + 0.20 * replay_confidence)
         elif bundle.sv_score is not None:
             total_w = cm_w + sv_w
             score = (cm_w * bundle.cm_score + sv_w * bundle.sv_score) / total_w

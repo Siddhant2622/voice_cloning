@@ -1611,6 +1611,8 @@ function analyzeAudioChunk(rawSamples, sampleRate = 16000) {
   const K_MAX = Math.min(half - 1, Math.round(7500 * fftN / sampleRate));
   const count = K_MAX - K_MIN;
 
+  let totalLowEnergy = 0, totalHighEnergy = 0, totalSubBassEnergy = 0;
+
   for (let fi = 0; fi + frameLen <= len; fi += hop) {
     let fRms = 0;
     for (let j = 0; j < frameLen; j++) fRms += samples[fi + j] * samples[fi + j];
@@ -1645,9 +1647,14 @@ function analyzeAudioChunk(rawSamples, sampleRate = 16000) {
     let logSum = 0, linSum = 0;
 
     for (let k = 1; k < half; k++) {
-      const m = Math.sqrt(real[k] * real[k] + imag[k] * imag[k]) + 1e-8;
+      const pwr = real[k] * real[k] + imag[k] * imag[k];
+      const m = Math.sqrt(pwr) + 1e-8;
       mags[k] = m;
       const freq = (k * sampleRate) / fftN;
+      if (freq >= 80 && freq < 260) totalSubBassEnergy += pwr;
+      if (freq >= 260 && freq <= 4000) totalLowEnergy += pwr;
+      if (freq > 4000 && freq < 7800) totalHighEnergy += pwr;
+
       if (freq >= 300 && freq < 3000) lfEnergy += m * m;
       if (freq >= 3000 && freq < 7500) hfEnergy += m * m;
       logSum += Math.log(m);
@@ -1718,8 +1725,8 @@ function analyzeAudioChunk(rawSamples, sampleRate = 16000) {
       d2.push(pitches[i] - 2 * pitches[i - 1] + pitches[i - 2]);
     }
     const d2Mean = d2.reduce((a, b) => a + b, 0) / d2.length;
-    f0D2Std = Math.sqrt(d2.reduce((a, b) => a + (b - d2Mean) ** 2, 0) / d2.length);
-  }
+  const bwRatio = (totalHighEnergy + 1e-10) / (totalLowEnergy + 1e-10);
+  const subBassRatio = (totalSubBassEnergy + 1e-10) / (totalLowEnergy + 1e-10);
 
   return {
     rms,
@@ -1729,6 +1736,8 @@ function analyzeAudioChunk(rawSamples, sampleRate = 16000) {
     f0D2Std,
     meanHf,
     meanFlat,
+    bwRatio,
+    subBassRatio,
     pitchesCount: pitches.length,
     cppCount: cppList.length,
     tiltsCount: tilts.length,
@@ -1917,8 +1926,8 @@ function evaluateEdgeRisk(analysis) {
       sessionEma = 0.95 * sessionEma + 0.05 * 0.10;
       consecutiveAiWindows = Math.max(0, consecutiveAiWindows - 1);
     }
-    const currentVerd = sessionEma >= 0.70 ? 'BLOCK' : sessionEma >= 0.50 ? 'ALERT' : sessionEma >= 0.35 ? 'STEP_UP' : 'ALLOW';
-    const statusTxt = sessionEma >= 0.50 ? "Synthetic voice detected — listening..." : "Ambient room acoustics (listening)...";
+    const currentVerd = sessionEma >= 0.70 ? 'BLOCK' : sessionEma >= 0.48 ? 'ALERT' : sessionEma >= 0.30 ? 'STEP_UP' : 'ALLOW';
+    const statusTxt = sessionEma >= 0.48 ? "Synthetic voice detected — listening..." : "Ambient room acoustics (listening)...";
     handleScore({
       type: 'score',
       timestamp: new Date().toISOString(),
@@ -1945,11 +1954,26 @@ function evaluateEdgeRisk(analysis) {
     const tilt = Number(analysis.meanTilt) || -16.0;
     const hf = Number(analysis.meanHf) || 0;
     const flat = Number(analysis.meanFlat) || 0;
+    const bwRatio = Number(analysis.bwRatio) || 0;
+    const subBassRatio = Number(analysis.subBassRatio) || 0;
     const nPitch = Number(analysis.pitchesCount) || 0;
     const nCpp = Number(analysis.cppCount) || 0;
     const nTilt = Number(analysis.tiltsCount) || 0;
 
-    // ── 1. Cepstral Peak Prominence (CPP) ────────────────────────────────
+    // ── 1. Mobile Phone Loudspeaker Replay Signature (Physical Transducer Cutoff) ──
+    // Live human speech close to a microphone retains strong sub-bass vocal fundamental (80-260Hz > 0.08)
+    // and upper harmonic/fricative bandwidth (>4kHz).
+    // Small mobile phone speakers physically cannot radiate frequencies < 260Hz or > 3800Hz.
+    const isMobileSpeakerBandpass = (subBassRatio < 0.035 && bwRatio < 0.003 && nPitch >= 3);
+    if (isMobileSpeakerBandpass) {
+      llr += 4.5;
+      reasons.push(`mobile speaker acoustic bandpass (sub-bass=${subBassRatio.toFixed(4)}, HF=${bwRatio.toFixed(4)})`);
+    } else if (subBassRatio < 0.050 && bwRatio < 0.008 && nPitch >= 4) {
+      llr += 2.5;
+      reasons.push(`attenuated acoustic bandwidth (transducer rolloff)`);
+    }
+
+    // ── 2. Cepstral Peak Prominence (CPP) ────────────────────────────────
     // Human vocal cords have natural turbulent friction & air leakage: CPP 2.8 - 3.8
     // Neural vocoders (Gemini Live/ElevenLabs) have impulse/periodic excitation: CPP 4.6 - 7.5+
     if (nCpp >= 4) {
@@ -1957,15 +1981,18 @@ function evaluateEdgeRisk(analysis) {
         llr += 3.2;
         reasons.push(`vocoder harmonic rigidity (CPP=${cpp.toFixed(1)})`);
       } else if (cpp >= 4.0) {
-        llr += 1.6;
+        llr += 1.8;
         reasons.push(`elevated harmonic resonance (CPP=${cpp.toFixed(1)})`);
       } else if (cpp <= 3.7) {
-        llr -= 2.8;
-        reasons.push(`natural glottal turbulence (CPP=${cpp.toFixed(1)})`);
+        // Only reward natural glottal turbulence if live human sub-bass fundamental is actually present!
+        if (subBassRatio > 0.06 && d2 > 28.0) {
+          llr -= 2.8;
+          reasons.push(`natural glottal turbulence (CPP=${cpp.toFixed(1)})`);
+        }
       }
     }
 
-    // ── 2. Pitch Curvature & Physiological Tremor (d2) ───────────────────
+    // ── 3. Pitch Curvature & Physiological Tremor (d2) ───────────────────
     // Human laryngeal muscles have natural 8-12Hz micro-tremor (d2 > 33)
     // Neural TTS models predict smooth/piecewise polynomial contours (d2 < 20)
     if (nPitch >= 6) {
@@ -1974,13 +2001,15 @@ function evaluateEdgeRisk(analysis) {
         reasons.push(`rigid synthetic pitch contour (d2=${d2.toFixed(1)})`);
       } else if (d2 < 25.0) {
         llr += 1.2;
-      } else if (d2 > 33.0) {
+        reasons.push(`suppressed pitch micro-tremor (d2=${d2.toFixed(1)})`);
+      } else if (d2 > 33.0 && subBassRatio > 0.06) {
+        // True physiological laryngeal tremor requires genuine live acoustic sub-bass
         llr -= 2.6;
         reasons.push(`physiological laryngeal tremor (d2=${d2.toFixed(1)})`);
       }
     }
 
-    // ── 3. Voiced Spectral Tilt Slope ───────────────────────────────────
+    // ── 4. Voiced Spectral Tilt Slope ───────────────────────────────────
     // Natural human glottal closure produces steep roll-off (-15.5 to -22 dB)
     // Neural vocoders introduce high-frequency boost/phase noise (-8 to -13 dB)
     if (nTilt >= 4) {
@@ -1990,42 +2019,29 @@ function evaluateEdgeRisk(analysis) {
       } else if (tilt > -14.0) {
         llr += 0.8;
       } else if (tilt < -15.5) {
-        llr -= 2.2;
-        reasons.push(`natural glottal closure roll-off (tilt=${tilt.toFixed(1)}dB)`);
+        if (subBassRatio > 0.06) {
+          llr -= 2.2;
+          reasons.push(`natural glottal closure roll-off (tilt=${tilt.toFixed(1)}dB)`);
+        }
       }
     }
 
-    // ── 4. Upper Spectrum Phase Noise / Harmonic Decay ──────────────────
+    // ── 5. Upper Spectrum Phase Noise / Harmonic Dispersion ─────────────
     if (nTilt >= 4 && hf > 2.5) {
       llr += 1.4;
       reasons.push(`upper-spectrum phase dispersion`);
-    } else if (nTilt >= 4 && hf < 1.4) {
-      llr -= 1.2;
-      reasons.push(`clean acoustic harmonic decay`);
     }
 
-    // ── 5. Classical Synthesizer / Cutoff Detection ─────────────────────
+    // ── 6. Classical Synthesizer / Cutoff Detection ─────────────────────
     if (flat < 0.045 && hf < 0.05) {
       llr += 3.0;
       reasons.push(`synthesizer bandwidth cutoff`);
     }
 
-    // ── 6. Physical Replay & Microphone Compensation (ASVspoof 2017 V2) ──
-    // Microphone preamps on laptops/smartphones create ambient thermal high-frequency floor.
-    // When physiological laryngeal tremor (d2 > 28) and natural glottal turbulence (cpp <= 3.8)
-    // are confirmed, discount ambient mic hiss to eliminate false alarms on real mics.
-    const isBiologicalLarynx = (nPitch >= 6 && d2 > 28.0 && cpp <= 3.8);
-    if (isBiologicalLarynx) {
-      if (hf > 2.0) llr -= 1.2; // compensate for laptop mic thermal hiss
-      if (tilt > -14.0 && tilt <= -12.0) llr -= 0.8; // compensate for electret low-end rolloff
-    }
-
-    // Physical loudspeaker-to-microphone replay signature (ASVspoof 2017 replay attack):
-    // Characterized by lack of involuntary laryngeal tremor (d2 < 24) combined with
-    // speaker transducer non-linear distortion (hf > 1.8, or tilt > -13.0) and high periodicity (cpp >= 4.1).
-    if (nPitch >= 6 && d2 < 24.0 && (cpp >= 4.1 || tilt > -13.0) && (hf > 1.8 || flat > 0.08)) {
-      llr += 2.6;
-      reasons.push(`physical replay acoustic signature (loudspeaker air-path distortion)`);
+    // ── 7. Cross-Device Replay Compound Signature (ASVspoof 2017 V2) ────
+    if (isMobileSpeakerBandpass && (cpp >= 4.0 || tilt > -13.0)) {
+      llr += 2.5;
+      reasons.push(`cross-device AI voice replay confirmed`);
     }
 
     // Logistic posterior probability
@@ -2048,14 +2064,14 @@ function evaluateEdgeRisk(analysis) {
     if (!Number.isFinite(sessionEma)) sessionEma = 0.10;
     sessionEma = 0.40 * cm + 0.60 * sessionEma;
 
-    if (sessionEma >= 0.55) {
+    if (sessionEma >= 0.50) {
       consecutiveAiWindows++;
     } else {
       consecutiveAiWindows = Math.max(0, consecutiveAiWindows - 1);
     }
 
     // Build explanatory reason
-    if (sessionEma >= 0.55) {
+    if (sessionEma >= 0.48) {
       const topReasons = reasons.filter(r => !r.includes('natural') && !r.includes('clean'));
       reason = topReasons.length > 0 
         ? "Synthetic voice signatures: " + topReasons.slice(0, 3).join(', ') + "."
@@ -2070,11 +2086,11 @@ function evaluateEdgeRisk(analysis) {
 
   // Decision Thresholds
   let decision = 'ALLOW';
-  if ((sessionEma >= 0.62 && consecutiveAiWindows >= 2) || sessionEma >= 0.78) {
+  if ((sessionEma >= 0.60 && consecutiveAiWindows >= 2) || sessionEma >= 0.72) {
     decision = 'BLOCK';
   } else if (sessionEma >= 0.48) {
     decision = 'ALERT';
-  } else if (sessionEma >= 0.32) {
+  } else if (sessionEma >= 0.30) {
     decision = 'STEP_UP';
   }
 

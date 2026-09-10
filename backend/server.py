@@ -71,6 +71,11 @@ def _load_models(settings: Settings) -> None:
     try:
         # Pull from HF Hub if configured and checkpoint not local
         ckpt = Path(settings.cm_checkpoint)
+        if not ckpt.exists():
+            for candidate in ["models/cm_detect2b_v4.pt", "models/cm_detect2b_v3.pt", "models/cm_detect2b_v2.pt", "models/cm.pt"]:
+                if Path(candidate).exists():
+                    ckpt = Path(candidate)
+                    break
         if not ckpt.exists() and settings.hf_repo_id:
             logger.info("Pulling checkpoint from HF Hub: %s", settings.hf_repo_id)
             from data.download_datasets import pull_checkpoint_from_hub
@@ -329,6 +334,7 @@ def _score_waveform(wav) -> Dict:
         flatness_score=lv_result.get("flatness_score"),
         jitter_score=lv_result.get("jitter_score"),
         contrast_score=lv_result.get("contrast_score"),
+        bandwidth_score=lv_result.get("bandwidth_score"),
     )
     fs = _models["fusion"].score(bundle)
     ctx = RiskContext(fusion_score=fs)
