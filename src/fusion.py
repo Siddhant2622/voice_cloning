@@ -122,16 +122,18 @@ class FusionModel:
             ) / total_w
 
             # Biological liveness protection:
-            # If CM score is low-to-moderate (< 0.70) and liveness is clearly human (< 0.25),
-            # protect genuine speakers from false positives due to room acoustics.
-            if bundle.cm_score < 0.70 and bundle.liveness_score < 0.25:
-                human_confidence = 1.0 - (bundle.liveness_score / 0.25)
-                score = score * (1.0 - 0.25 * human_confidence)
+            # Only suppress if BOTH signals strongly agree it's genuine human:
+            # cm_score < 0.50 (low confidence from CM) AND liveness < 0.15 (very clearly live).
+            # The old thresholds (< 0.70 / < 0.25) were too loose — they suppressed
+            # detection of AI voice that picked up natural room acoustics via a mobile mic.
+            if bundle.cm_score < 0.50 and bundle.liveness_score < 0.15:
+                human_confidence = 1.0 - (bundle.liveness_score / 0.15)
+                score = score * (1.0 - 0.20 * human_confidence)
 
             # High-confidence attack override:
-            # When the deep neural CM classifier detects synthetic speech with high confidence (>= 0.75),
-            # passive liveness must not suppress the detection (critical for neural TTS like Gemini Live).
-            if bundle.cm_score >= 0.75:
+            # Lowered from 0.75 → 0.65 so a moderately-confident CM detection
+            # (cross-device AI voice may score 0.60–0.70) is not suppressed.
+            if bundle.cm_score >= 0.65:
                 score = max(score, bundle.cm_score * 0.92)
         elif bundle.sv_score is not None:
             total_w = cm_w + sv_w

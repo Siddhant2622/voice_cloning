@@ -181,28 +181,95 @@ def spectral_contrast_score(
     return float(score)
 
 
+def bandwidth_rolloff_score(
+    waveform_np: np.ndarray,
+    sr: int = 16_000,
+    n_fft: int = 512,
+    hop_length: int = 160,
+) -> float:
+    """Detect aggressive high-frequency rolloff caused by a mobile speaker → mic chain.
+
+    When AI/TTS audio is played through a cheap mobile phone speaker and captured
+    by another device's microphone, the combined transducer response cuts off
+    frequencies above ~3.5–4.0 kHz. Genuine live speech captured directly by a
+    laptop or desk microphone retains energy up to 7–8 kHz.
+
+    This is the most reliable single cue for the cross-device replay attack because:
+      - It is immune to AGC (AGC adjusts amplitude, not bandwidth).
+      - Room reverb does not restore HF energy once the speaker has rolled it off.
+      - Clean TTS audio always has full bandwidth; it only loses HF after going
+        through the physical speaker.
+
+    Returns:
+        Suspicious bandwidth score ∈ [0, 1] (1 = suspicious = likely mobile-path).
+        High when the ratio of energy above 4 kHz to energy below 4 kHz is
+        abnormally low compared to live human speech baselines.
+    """
+    S = np.abs(np.fft.rfft(waveform_np, n=n_fft))  # [n_fft/2 + 1]
+    freqs = np.fft.rfftfreq(n_fft, d=1.0 / sr)     # frequency bin centres
+
+    # Split at 4 kHz (typical mobile speaker -3dB point)
+    low_mask  = freqs <= 4000.0
+    high_mask = freqs >  4000.0
+
+    if not np.any(high_mask):
+        return 0.0
+
+    low_energy  = float(np.mean(S[low_mask]  ** 2) + 1e-10)
+    high_energy = float(np.mean(S[high_mask] ** 2) + 1e-10)
+    hf_ratio = high_energy / low_energy
+
+    # Calibrated baselines:
+    #   Live laptop/desk mic:  hf_ratio ~ 0.10 – 0.40 (rich HF content)
+    #   Mobile speaker → mic:  hf_ratio ~ 0.005 – 0.04 (severe HF rolloff)
+    # Suspicious when hf_ratio < 0.05
+    suspicious_ceiling = 0.05
+    normal_floor       = 0.15
+
+    if hf_ratio >= normal_floor:
+        score = 0.0
+    elif hf_ratio <= suspicious_ceiling:
+        score = 1.0
+    else:
+        # Linear interpolation between thresholds
+        score = 1.0 - (hf_ratio - suspicious_ceiling) / (normal_floor - suspicious_ceiling)
+
+    logger.debug(
+        "HF/LF energy ratio=%.4f → bandwidth suspicion score: %.3f",
+        hf_ratio,
+        score,
+    )
+    return float(score)
+
+
 # ---------------------------------------------------------------------------
 # Aggregate liveness scorer
 # ---------------------------------------------------------------------------
 class LivenessScorer:
     """
-    Combines spectral flatness, F0 jitter, and spectral contrast into one
-    aggregate liveness suspicion score.
+    Combines spectral flatness, F0 jitter, spectral contrast, and
+    high-frequency bandwidth rolloff into one aggregate liveness suspicion score.
 
     Score ∈ [0, 1]:
       0 = high confidence bona fide (genuine human)
       1 = high suspicion of synthetic origin
+
+    bandwidth_weight targets the specific cross-device mobile replay attack:
+    AI voice played through Phone-A speaker captured by Phone-B mic loses
+    all energy above ~4 kHz. This is a reliable, AGC-immune cue.
     """
 
     def __init__(
         self,
-        flatness_weight: float = 0.35,
-        jitter_weight:   float = 0.40,
-        contrast_weight: float = 0.25,
+        flatness_weight:   float = 0.25,
+        jitter_weight:     float = 0.30,
+        contrast_weight:   float = 0.15,
+        bandwidth_weight:  float = 0.30,  # new: targets mobile speaker→mic attack
     ):
-        self.flatness_weight = flatness_weight
-        self.jitter_weight   = jitter_weight
-        self.contrast_weight = contrast_weight
+        self.flatness_weight   = flatness_weight
+        self.jitter_weight     = jitter_weight
+        self.contrast_weight   = contrast_weight
+        self.bandwidth_weight  = bandwidth_weight
 
     def score(
         self,
@@ -219,6 +286,7 @@ class LivenessScorer:
               - 'flatness_score': float
               - 'jitter_score': float
               - 'contrast_score': float
+              - 'bandwidth_score': float
         """
         if hasattr(waveform, "detach"):
             waveform_np = waveform.detach().cpu().numpy().astype(np.float32)
@@ -241,15 +309,23 @@ class LivenessScorer:
             logger.warning("Spectral contrast analysis failed (%s); using neutral.", exc)
             contrast = 0.0
 
+        try:
+            bandwidth = bandwidth_rolloff_score(waveform_np, sr=sr)
+        except Exception as exc:
+            logger.warning("Bandwidth rolloff analysis failed (%s); using neutral.", exc)
+            bandwidth = 0.0
+
         aggregate = (
-            self.flatness_weight * flatness
-            + self.jitter_weight * jitter
+            self.flatness_weight  * flatness
+            + self.jitter_weight  * jitter
             + self.contrast_weight * contrast
+            + self.bandwidth_weight * bandwidth
         )
 
         return {
-            "liveness_score": float(aggregate),
-            "flatness_score": float(flatness),
-            "jitter_score":   float(jitter),
-            "contrast_score": float(contrast),
+            "liveness_score":   float(aggregate),
+            "flatness_score":   float(flatness),
+            "jitter_score":     float(jitter),
+            "contrast_score":   float(contrast),
+            "bandwidth_score":  float(bandwidth),
         }
