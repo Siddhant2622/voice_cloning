@@ -1177,6 +1177,21 @@
 
 <script src="samples/samples_data.js"></script>
 <script>
+/* ─── Global Tab Navigation ─────────────────────────────────────────────── */
+function switchTab(name) {
+  ['live','batch','bench','about'].forEach(t => {
+    const pane = document.getElementById('tab-' + t);
+    if (pane) pane.classList.toggle('active', t === name);
+    const btn = document.getElementById('tab-' + t + '-btn');
+    if (btn) {
+      btn.classList.toggle('active', t === name);
+      btn.setAttribute('aria-selected', t === name ? 'true' : 'false');
+    }
+  });
+  if (name === 'bench' && typeof initBenchmarkChart === 'function') initBenchmarkChart();
+}
+window.switchTab = switchTab;
+
 /* ─── State Management ─────────────────────────────────────────────────── */
 let ws           = null;
 let audioCtx     = null;
