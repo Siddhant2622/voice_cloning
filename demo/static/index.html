@@ -471,27 +471,69 @@
     }
     .analyst-input-row .form-input { flex: 1; min-width: 140px; font-size: 12px; }
 
-    /* ─── Tab Navigation ─────────────────────────────────────────────────── */
+        /* ─── Tab Navigation ─────────────────────────────────────────────────── */
     .tab-nav {
-      display: flex; gap: 4px; background: rgba(14,22,38,0.7);
-      border: 1px solid var(--border); border-radius: 14px;
-      padding: 5px; margin-bottom: 28px;
-      backdrop-filter: blur(12px); flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      background: rgba(13, 17, 29, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 6px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(16px);
+    }
+    @media (max-width: 900px) {
+      .tab-nav {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }
     .tab-btn {
-      flex: 1; min-width: 120px;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 10px 18px; border-radius: 10px; border: none;
-      background: transparent; color: var(--text-muted);
-      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all 0.25s; white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.25s;
+      min-width: 0;
+      text-align: center;
     }
-    .tab-btn:hover { background: rgba(79,142,247,0.1); color: var(--text-primary); }
+    .tab-btn .tab-kr {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .tab-btn .tab-en {
+      font-family: 'Outfit', sans-serif;
+      font-size: 10px;
+      font-weight: 500;
+      opacity: 0.65;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      background: rgba(255, 45, 104, 0.08);
+      color: var(--text-primary);
+      border-color: rgba(255, 45, 104, 0.2);
+    }
     .tab-btn.active {
-      background: linear-gradient(135deg, rgba(255, 45, 104, 0.24), rgba(139, 92, 246, 0.28));
+      background: linear-gradient(135deg, rgba(255, 45, 104, 0.25), rgba(139, 92, 246, 0.3));
       color: #ffffff;
-      border: 1px solid rgba(255, 45, 104, 0.45);
-      box-shadow: 0 0 20px rgba(255, 45, 104, 0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+      border: 1px solid rgba(255, 45, 104, 0.5);
+      box-shadow: 0 0 20px rgba(255, 45, 104, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    .tab-btn.active .tab-en {
+      opacity: 0.95;
+      color: #ffd1dc;
     }
     .tab-badge {
       background: var(--accent); color: #fff; border-radius: 20px;
@@ -624,17 +666,21 @@
 
   <!-- Tab Navigation -->
   <nav class="tab-nav" role="tablist" aria-label="VoiceGuard Sections">
-    <button class="tab-btn active" id="tab-live-btn"    onclick="switchTab('live')"    role="tab" aria-selected="true">
-      🎬 실시간 분석 (Live Analysis)
+    <button class="tab-btn active" id="tab-live-btn" onclick="switchTab('live')" role="tab" aria-selected="true">
+      <span class="tab-kr">🎬 실시간 분석</span>
+      <span class="tab-en">Live Analysis</span>
     </button>
-    <button class="tab-btn"        id="tab-batch-btn"   onclick="switchTab('batch')"   role="tab" aria-selected="false">
-      💾 일괄 분석기 (Batch Analyzer)
+    <button class="tab-btn" id="tab-batch-btn" onclick="switchTab('batch')" role="tab" aria-selected="false">
+      <span class="tab-kr">💾 일괄 분석기</span>
+      <span class="tab-en">Batch Analyzer</span>
     </button>
-    <button class="tab-btn"        id="tab-bench-btn"   onclick="switchTab('bench')"   role="tab" aria-selected="false">
-      📊 벤치마크 (Benchmark Explorer)
+    <button class="tab-btn" id="tab-bench-btn" onclick="switchTab('bench')" role="tab" aria-selected="false">
+      <span class="tab-kr">📊 벤치마크</span>
+      <span class="tab-en">Benchmark Explorer</span>
     </button>
-    <button class="tab-btn"        id="tab-about-btn"   onclick="switchTab('about')"   role="tab" aria-selected="false">
-      📚 기술 백서 (About &amp; Research)
+    <button class="tab-btn" id="tab-about-btn" onclick="switchTab('about')" role="tab" aria-selected="false">
+      <span class="tab-kr">📚 기술 백서</span>
+      <span class="tab-en">About &amp; Research</span>
     </button>
   </nav>
 
@@ -1035,12 +1081,12 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>File Name</th>
-            <th>Size</th>
-            <th>Acoustic Score</th>
-            <th>Temporal Score</th>
-            <th>AI Probability</th>
-            <th>Verdict</th>
+            <th>파일명 (File Name)</th>
+            <th>크기 (Size)</th>
+            <th>음향 점수 (Acoustic)</th>
+            <th>시계열 점수 (Temporal)</th>
+            <th>AI 확률 (AI Prob)</th>
+            <th>판정 (Verdict)</th>
           </tr>
         </thead>
         <tbody id="batch-tbody"></tbody>
@@ -3140,13 +3186,13 @@ function renderBatchTable() {
 }
 
 function getVerdict(score) {
-  if (score >= 0.62) return 'Likely AI-generated';
-  if (score <= 0.35) return 'Likely human';
-  return 'Uncertain';
+  if (score >= 0.62) return '위조 음성 (AI-Gen)';
+  if (score <= 0.35) return '정상 사람 (Human)';
+  return '추가 검증 (Review)';
 }
 
 async function runBatchAnalysis() {
-  if (!batchFiles.length) { alert('Drop some audio files first.'); return; }
+  if (!batchFiles.length) { alert('분석할 오디오 파일을 먼저 추가해 주세요. (Drop audio files first.)'); return; }
   batchResults = new Array(batchFiles.length).fill(null);
   renderBatchTable();
 
@@ -3201,7 +3247,7 @@ function clearBatch() {
   const tbody = document.getElementById('batch-tbody');
   if (tbody) tbody.innerHTML = '';
   const dropTxt = document.getElementById('batch-dropzone-text');
-  if (dropTxt) dropTxt.textContent = 'Drop audio files here or click to browse';
+  if (dropTxt) dropTxt.textContent = '오디오 파일을 여기에 드래그하거나 클릭하여 선택하십시오 (WAV, MP3, FLAC, OGG, WebM)';
   document.getElementById('batch-summary').textContent = '';
 }
 
