@@ -566,7 +566,7 @@
     }
     .stat-pill span { color: var(--accent); }
   </style>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
 
@@ -976,6 +976,7 @@
       </div>
     </div>
 
+  </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -3173,43 +3174,46 @@ function initBenchmarkChart() {
   const canvas = document.getElementById('bench-chart');
   if (!canvas) return;
 
-  // Try to load Chart.js dynamically
-  if (!window.Chart) {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-    s.onload = () => renderChart(canvas);
-    document.head.appendChild(s);
-  } else {
-    renderChart(canvas);
-  }
+  renderChart(canvas);
 
-  // Also try to load real benchmark from API
-  const benchUrl = (!location.host) ? 'http://localhost:8000/api/v1/benchmark' : '/api/v1/benchmark';
+  if (_chartInitialized) return;
+  _chartInitialized = true;
+
+  // Attempt to load benchmark data from backend or serverless API
+  const benchUrl = customWsUrl ? customWsUrl.replace(/^ws/, 'http').replace(/\/ws\/stream$/, '/api/v1/benchmark') : '/api/v1/benchmark';
   fetch(benchUrl)
     .then(r => r.ok ? r.json() : null)
     .then(data => {
       if (!data) return;
       const voiceguardResult = data.results?.voiceguard_cm;
       if (voiceguardResult?.eer !== null && voiceguardResult?.eer !== undefined) {
-        BENCH_DATA.published.find(d => d.name === 'VoiceGuard CM').eer = voiceguardResult.eer;
-        document.getElementById('bench-voiceguard-eer').textContent = voiceguardResult.eer.toFixed(2) + '%';
-        document.getElementById('bench-voiceguard-tdcf').textContent = (voiceguardResult.min_tDCF || 0).toFixed(4);
-        if (_chartInitialized) renderChart(canvas);
+        const found = BENCH_DATA.published.find(d => d.name === 'VoiceGuard CM');
+        if (found) found.eer = voiceguardResult.eer;
+        const eerElem = document.getElementById('bench-voiceguard-eer');
+        if (eerElem) eerElem.textContent = voiceguardResult.eer.toFixed(2) + '%';
+        const tdcfElem = document.getElementById('bench-voiceguard-tdcf');
+        if (tdcfElem) tdcfElem.textContent = (voiceguardResult.min_tDCF || 0).toFixed(4);
+        renderChart(canvas);
       }
     })
     .catch(() => {});
-
-  _chartInitialized = true;
 }
 
 function renderChart(canvas) {
+  if (!window.Chart) {
+    setTimeout(() => renderChart(canvas), 150);
+    return;
+  }
   const labels = BENCH_DATA.published.map(d => d.name);
   const values = BENCH_DATA.published.map(d => d.eer ?? 0);
   const colors = BENCH_DATA.published.map(d => d.color);
 
-  if (window._benchChart) window._benchChart.destroy();
-  window._benchChart = new Chart(canvas, {
-    type: 'bar',
+  if (window._benchChart) {
+    try { window._benchChart.destroy(); } catch (e) {}
+  }
+  try {
+    window._benchChart = new Chart(canvas, {
+      type: 'bar',
     data: {
       labels,
       datasets: [{

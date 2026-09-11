@@ -49,6 +49,14 @@
     {
       "source": "/detect",
       "destination": "/api/detect"
+    },
+    {
+      "source": "/api/v1/benchmark",
+      "destination": "/api/benchmark"
+    },
+    {
+      "source": "/api/benchmark",
+      "destination": "/api/benchmark"
     }
   ]
 }
