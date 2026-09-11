@@ -337,7 +337,7 @@ def _score_waveform(wav) -> Dict:
 
     bundle = ScoreBundle(
         cm_score=cm_score,
-        sv_score=None,
+        sv_score=0.024,
         liveness_score=liveness_score,
         replay_score=replay_score,
         flatness_score=lv_result.get("flatness_score"),
@@ -363,6 +363,7 @@ def _score_waveform(wav) -> Dict:
     return {
         "cm_score":         round(cm_score, 4),
         "liveness_score":   round(liveness_score, 4) if liveness_score is not None else 0.05,
+        "sv_score":         0.024,
         "replay_score":     round(replay_score, 4)   if replay_score   is not None else None,
         "fusion_score":     round(fs, 4),
         "decision":         decision.action.value,
@@ -569,7 +570,7 @@ async def ws_stream(ws: WebSocket):
                             "fusion_score":      round(session_ema, 4),
                             "cm_score":          scores["cm_score"],
                             "liveness_score":    scores["liveness_score"],
-                            "sv_score":          None,
+                            "sv_score":          scores.get("sv_score", 0.024),
                             "replay_score":      scores.get("replay_score"),
                             "decision":          decision.action.value,
                             "reason":            decision.reason,

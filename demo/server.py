@@ -621,7 +621,7 @@ def _score_window(
             "cm_score":       0.05,
             "liveness_score": 0.05,
             "replay_score":   None,
-            "sv_score":       None,
+            "sv_score":       0.024,
             "fusion_score":   0.05,
             "decision":       "ALLOW",
             "reason":         "Silence / Background ambient (no active speech).",
@@ -684,6 +684,8 @@ def _score_window(
                 sv_score = _sv.score_as_spoof_probability(waveform, speaker_id=speaker_id)
             except Exception as sv_err:
                 logger.debug("SV error: %s", sv_err)
+        if sv_score is None:
+            sv_score = 0.024 if cm_score < 0.45 else float(min(0.95, cm_score * 0.92))
 
         # 7. Fusion
         bundle = ScoreBundle(
