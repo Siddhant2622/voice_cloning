@@ -3,45 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VoiceGuard — Real-Time Voice Clone Detection</title>
+  <title>보이스가드 VoiceGuard — 실시간 AI 음성 복제 탐지 및 방어</title>
   <meta name="description"
         content="AI-powered real-time voice clone and synthetic speech detection system. Detects deepfake audio attacks on live calls." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     /* ─── Design Tokens ──────────────────────────────────────────────────── */
     :root {
-      --bg-base:       #080c14;
-      --bg-panel:      rgba(14, 22, 38, 0.85);
-      --bg-panel-2:    rgba(20, 30, 52, 0.70);
-      --border:        rgba(78, 143, 247, 0.18);
-      --border-bright: rgba(78, 143, 247, 0.45);
-      --accent:        #4f8ef7;
-      --accent-glow:   rgba(79, 142, 247, 0.35);
-      --text-primary:  #e8edf8;
-      --text-muted:    #7a8aab;
-      --green:         #2edd9b;
-      --green-glow:    rgba(46, 221, 155, 0.3);
-      --amber:         #f5c542;
-      --amber-glow:    rgba(245, 197, 66, 0.3);
-      --orange:        #f57f42;
-      --orange-glow:   rgba(245, 127, 66, 0.3);
-      --red:           #f74f6a;
-      --red-glow:      rgba(247, 79, 106, 0.35);
-      --radius:        14px;
-      --radius-sm:     8px;
+      --bg-base:       #07090f;
+      --bg-panel:      rgba(13, 17, 29, 0.85);
+      --bg-panel-2:    rgba(22, 29, 48, 0.65);
+      --border:        rgba(255, 45, 104, 0.18);
+      --border-bright: rgba(255, 45, 104, 0.50);
+      --accent:        #ff2d68; /* Mugunghwa Neon Hibiscus */
+      --accent-glow:   rgba(255, 45, 104, 0.40);
+      --accent-sub:    #00f0a8; /* Celadon Jade */
+      --accent-blue:   #3b82f6; /* Han River Cyan/Blue */
+      --accent-purple: #8b5cf6; /* Seoul Cyber Violet */
+      --text-primary:  #f3f6fc;
+      --text-muted:    #8494b2;
+      --green:         #00f0a8; /* Celadon Jade Green */
+      --green-glow:    rgba(0, 240, 168, 0.35);
+      --amber:         #ffb703; /* Dancheong Gold */
+      --amber-glow:    rgba(255, 183, 3, 0.35);
+      --orange:        #ff6f3c; /* Dancheong Ember */
+      --orange-glow:   rgba(255, 111, 60, 0.35);
+      --red:           #ff0055; /* Neon Crimson */
+      --red-glow:      rgba(255, 0, 85, 0.45);
+      --radius:        16px;
+      --radius-sm:     10px;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Outfit', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg-base);
       color: var(--text-primary);
       min-height: 100vh;
       overflow-x: hidden;
+      letter-spacing: -0.01em;
+    }
+
+    /* Korean Cyber Neon Top Glow Line */
+    body::after {
+      content: '';
+      position: fixed; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #ff2d68, #8b5cf6, #3b82f6, #00f0a8, #ffb703, #ff2d68);
+      background-size: 300% 100%;
+      animation: kCyberGlow 8s linear infinite;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    @keyframes kCyberGlow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 300% 50%; }
+    }
+
+    .k-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.8px;
+      background: rgba(255, 45, 104, 0.15);
+      border: 1px solid rgba(255, 45, 104, 0.4);
+      color: #ff2d68;
+      padding: 2px 8px; border-radius: 12px;
+      margin-left: 8px; vertical-align: middle;
+      box-shadow: 0 0 10px rgba(255, 45, 104, 0.2);
     }
 
     /* Animated background */
@@ -49,9 +77,10 @@
       content: '';
       position: fixed; inset: 0;
       background:
-        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(79,142,247,0.12) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 50% at 80% 90%, rgba(46,221,155,0.08) 0%, transparent 55%),
-        radial-gradient(ellipse 70% 40% at 50% 50%, rgba(247,79,106,0.05) 0%, transparent 60%);
+        radial-gradient(ellipse 75% 50% at 15% 10%, rgba(255, 45, 104, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 65% 50% at 85% 20%, rgba(139, 92, 246, 0.14) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 60% at 50% 90%, rgba(0, 240, 168, 0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 50% 45%, rgba(13, 17, 28, 0.70) 0%, transparent 70%);
       pointer-events: none;
       z-index: 0;
     }
@@ -68,7 +97,7 @@
     .logo { display: flex; align-items: center; gap: 12px; }
     .logo-icon {
       width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #4f8ef7 0%, #2edd9b 100%);
+      background: linear-gradient(135deg, #ff2d68 0%, #8b5cf6 50%, #00f0a8 100%);
       display: flex; align-items: center; justify-content: center;
       font-size: 22px;
       box-shadow: 0 0 20px var(--accent-glow);
@@ -459,9 +488,10 @@
     }
     .tab-btn:hover { background: rgba(79,142,247,0.1); color: var(--text-primary); }
     .tab-btn.active {
-      background: linear-gradient(135deg, rgba(79,142,247,0.25), rgba(46,221,155,0.12));
-      color: var(--accent);
-      box-shadow: 0 0 16px rgba(79,142,247,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+      background: linear-gradient(135deg, rgba(255, 45, 104, 0.24), rgba(139, 92, 246, 0.28));
+      color: #ffffff;
+      border: 1px solid rgba(255, 45, 104, 0.45);
+      box-shadow: 0 0 20px rgba(255, 45, 104, 0.25), inset 0 1px 0 rgba(255,255,255,0.15);
     }
     .tab-badge {
       background: var(--accent); color: #fff; border-radius: 20px;
@@ -576,32 +606,35 @@
     <div class="logo">
       <div class="logo-icon">🛡️</div>
       <div>
-        <h1>Voice<span>Guard</span></h1>
-        <p style="font-size: 12px; color: var(--text-muted);">Real-Time Voice Clone Detection & Defense</p>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h1 style="display: flex; align-items: center; gap: 6px;">보이스가드 <span style="color: var(--accent);">VoiceGuard</span></h1>
+          <span class="k-tag">🇰🇷 K-보안</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-muted);">실시간 AI 음성 복제 탐지 및 위조 방어 체계 · Real-Time Deepfake Voice Defense</p>
       </div>
     </div>
     <div class="header-actions">
       <div class="header-status">
         <span class="status-dot edge" id="conn-dot"></span>
-        <span id="conn-label">Edge Engine Active (Browser)</span>
+        <span id="conn-label">엣지 엔진 활성 (Edge Active)</span>
       </div>
-      <button class="btn-settings" id="btn-open-settings">⚙️ Settings</button>
+      <button class="btn-settings" id="btn-open-settings">⚙️ 설정 (Settings)</button>
     </div>
   </header>
 
   <!-- Tab Navigation -->
   <nav class="tab-nav" role="tablist" aria-label="VoiceGuard Sections">
     <button class="tab-btn active" id="tab-live-btn"    onclick="switchTab('live')"    role="tab" aria-selected="true">
-      &#127910; Live Analysis
+      🎬 실시간 분석 (Live Analysis)
     </button>
     <button class="tab-btn"        id="tab-batch-btn"   onclick="switchTab('batch')"   role="tab" aria-selected="false">
-      &#128190; Batch Analyzer
+      💾 일괄 분석기 (Batch Analyzer)
     </button>
     <button class="tab-btn"        id="tab-bench-btn"   onclick="switchTab('bench')"   role="tab" aria-selected="false">
-      &#128202; Benchmark Explorer
+      📊 벤치마크 (Benchmark Explorer)
     </button>
     <button class="tab-btn"        id="tab-about-btn"   onclick="switchTab('about')"   role="tab" aria-selected="false">
-      &#128218; About &amp; Research
+      📚 기술 백서 (About &amp; Research)
     </button>
   </nav>
 
@@ -614,17 +647,17 @@
   <div class="preset-banner">
     <div style="display: flex; flex-direction: column; gap: 4px;">
       <div class="preset-title">
-        <span style="color: var(--accent); display: flex; align-items: center; gap: 6px;">☁️ Google Drive Dataset:</span>
-        <span style="font-size: 11px; color: var(--green); font-weight: 500; background: rgba(46,221,155,0.12); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(46,221,155,0.3);">🟢 Cloud Synced</span>
+        <span style="color: var(--accent); display: flex; align-items: center; gap: 6px;">☁️ 구글 드라이브 데이터셋:</span>
+        <span style="font-size: 11px; color: var(--green); font-weight: 500; background: rgba(46,221,155,0.12); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(46,221,155,0.3);">🟢 실시간 연동 (Synced)</span>
       </div>
       <div style="font-size: 11px; color: var(--text-muted);">
-        Stream & test genuine vs modern neural clones directly from Google Drive
+        실제 인물 음성 및 최신 신경망 복제 음성을 Google Drive에서 즉시 스트리밍 검증
       </div>
     </div>
     <div class="preset-btns" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-      <button class="btn-preset" id="preset-human" title="Stream clean studio human voice from Google Drive">&#128100; Studio Human (Drive)</button>
-      <button class="btn-preset" id="preset-synth" title="Stream US Jenny neural clone from Google Drive">&#129302; Jenny AI Clone (Drive)</button>
-      <button class="btn-preset" id="preset-neural" title="Stream US Guy neural clone from Google Drive">&#9889; Guy AI Clone (Drive)</button>
+      <button class="btn-preset" id="preset-human" title="Stream clean studio human voice from Google Drive">👤 실제 인물 (Human Voice)</button>
+      <button class="btn-preset" id="preset-synth" title="Stream US Jenny neural clone from Google Drive">🤖 제니 AI 복제 (Jenny AI)</button>
+      <button class="btn-preset" id="preset-neural" title="Stream US Guy neural clone from Google Drive">⚡ 가이 AI 복제 (Guy AI)</button>
       
       <select id="drive-sample-select" class="btn-preset" style="background: rgba(14,22,38,0.95); border-color: var(--accent); padding: 6px 12px; cursor: pointer; outline: none;">
         <option value="" disabled selected>📂 More Drive Samples (10 Available)...</option>
@@ -641,7 +674,7 @@
       </select>
 
       <a href="https://drive.google.com/drive/folders/1B5xNpwBbyI8a_RyK86wAFCl82K-ExjNe" target="_blank" rel="noopener noreferrer" class="btn-preset" style="background: rgba(79,142,247,0.18); border-color: var(--accent); color: var(--accent); text-decoration: none;" title="Open Google Drive folder containing full 118 MB modern dataset + 322 MB LibriSpeech">
-        ☁️ Drive Folder &#8599;
+        ☁️ 드라이브 폴더 &#8599;
       </a>
     </div>
   </div>
@@ -652,7 +685,7 @@
     <!-- Left: Risk Gauge & Live Decision -->
     <div class="panel">
       <div class="panel-title">
-        <span>Synthetic Spoof Probability</span>
+        <span>합성 위조 확률 · SPOOF PROBABILITY</span>
         <span style="font-size: 10px; color: var(--accent);">LAYER 5-7</span>
       </div>
 
@@ -661,28 +694,28 @@
           <path class="gauge-bg"  d="M 20 115 A 90 90 0 0 1 200 115" />
           <path class="gauge-arc" id="gauge-arc" d="M 20 115 A 90 90 0 0 1 200 115" />
           <text class="gauge-label" id="gauge-text" x="110" y="95" fill="var(--green)">0%</text>
-          <text class="gauge-subtext" x="110" y="118">SPOOF PROBABILITY</text>
+          <text class="gauge-subtext" x="110" y="118">위조 위험도 (RISK)</text>
         </svg>
 
         <div class="decision-badge decision-ALLOW" id="decision-badge">
           <span>🟢</span>
-          <span id="decision-text">ALLOW</span>
+          <span id="decision-text">정상 음성 (ALLOW)</span>
         </div>
-        <div class="decision-reason" id="decision-reason">Standing by for speech input.</div>
+        <div class="decision-reason" id="decision-reason">실시간 음성 입력을 대기하고 있습니다 (Standing by).</div>
       </div>
 
       <div class="metrics-row">
         <div class="metric-card">
           <div class="val" id="met-windows">0</div>
-          <div class="lbl">Windows</div>
+          <div class="lbl">분석 윈도우 (Windows)</div>
         </div>
         <div class="metric-card">
           <div class="val" id="met-p50">—</div>
-          <div class="lbl">Latency P50</div>
+          <div class="lbl">중간 지연 (P50)</div>
         </div>
         <div class="metric-card">
           <div class="val" id="met-p95">—</div>
-          <div class="lbl">Latency P95</div>
+          <div class="lbl">최대 지연 (P95)</div>
         </div>
       </div>
     </div>
@@ -690,7 +723,7 @@
     <!-- Right: Multi-Layer Acoustic Feature Scores -->
     <div class="panel">
       <div class="panel-title">
-        <span>Signal Layer Breakdown</span>
+        <span>신호 레이어 심층 분석 · SIGNAL LAYERS</span>
         <span style="font-size: 10px; color: var(--accent);">FUSION ENSEMBLE</span>
       </div>
 
@@ -698,40 +731,40 @@
         <!-- CM -->
         <div class="score-item">
           <div class="score-meta">
-            <span class="score-name">CM Classifier (WavLM + Wav2Vec2 · DETECT-2B)</span>
+            <span class="score-name">CM 심층 분류기 (WavLM + Wav2Vec2 · DETECT-2B)</span>
             <span class="score-val" id="val-cm">—</span>
           </div>
-          <div class="score-desc">Deep acoustic anti-spoofing score (0 = authentic, 1 = deepfake)</div>
+          <div class="score-desc">심층 음향 위조 점수 (0 = 정상 음성, 1 = 딥페이크 위조)</div>
           <div class="bar-bg"><div class="bar-fill" id="bar-cm"></div></div>
         </div>
 
         <!-- Liveness -->
         <div class="score-item">
           <div class="score-meta">
-            <span class="score-name">Liveness Heuristic (F0 Jitter / Flatness)</span>
+            <span class="score-name">생체 음향 생동성 감지 (Liveness Heuristic)</span>
             <span class="score-val" id="val-lv">—</span>
           </div>
-          <div class="score-desc">Vocal tract physiology & micro-tremor consistency check</div>
+          <div class="score-desc">성도 생리학적 공명 및 미세 떨림 일관성 검사</div>
           <div class="bar-bg"><div class="bar-fill" id="bar-lv"></div></div>
         </div>
 
         <!-- Speaker Verify -->
         <div class="score-item">
           <div class="score-meta">
-            <span class="score-name">Speaker Verification (ECAPA-TDNN)</span>
+            <span class="score-name">ECAPA-TDNN 화자 검증 (Speaker Verification)</span>
             <span class="score-val" id="val-sv">—</span>
           </div>
-          <div class="score-desc">Cosine voiceprint alignment against enrolled biometric reference</div>
+          <div class="score-desc">등록된 화자 생체 성문 코사인 유사도 대조</div>
           <div class="bar-bg"><div class="bar-fill" id="bar-sv"></div></div>
         </div>
 
         <!-- Fusion -->
         <div class="score-item">
           <div class="score-meta">
-            <span class="score-name" style="font-weight: 700; color: var(--accent);">Calibrated Fusion Ensemble</span>
+            <span class="score-name" style="font-weight: 700; color: var(--accent);">칼리브레이션 통합 앙상블 (Calibrated Fusion)</span>
             <span class="score-val" id="val-fusion" style="color: var(--accent);">—</span>
           </div>
-          <div class="score-desc">Temporal EWMA smoothed composite risk metric</div>
+          <div class="score-desc">시간적 EWMA 종합 위험도 지표</div>
           <div class="bar-bg"><div class="bar-fill" id="bar-fusion"></div></div>
         </div>
       </div>
@@ -740,20 +773,20 @@
     <!-- Full Width: Audio Input & Live Waveform -->
     <div class="panel col-full">
       <div class="panel-title">
-        <span>Live Audio Input & Waveform</span>
+        <span>실시간 오디오 입력 &amp; 파형 분석 · Live Audio</span>
         <div style="display: flex; gap: 8px; align-items: center;">
           <span id="stream-mode-badge" style="display: none; padding: 3px 9px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.03em;"></span>
-          <span id="input-status" style="font-size: 11px; color: var(--text-muted);">Ready</span>
+          <span id="input-status" style="font-size: 11px; color: var(--text-muted);">준비 완료 (Ready)</span>
         </div>
       </div>
 
       <div class="controls">
-        <button class="btn btn-primary" id="btn-mic">🎙️ Start Mic</button>
-        <button class="btn btn-accent" id="btn-stream-file" style="background: linear-gradient(135deg, #4f8ef7, #2edd9b); color: #080c14; font-weight: 600;">⚡ Stream File (Bypass Mic)</button>
-        <button class="btn btn-secondary" id="btn-file">📁 Upload Audio File</button>
-        <button class="btn btn-danger" id="btn-stop" disabled>⏹ Stop</button>
-        <button class="btn btn-secondary" id="btn-challenge">🎲 Generate Challenge</button>
-        <button class="btn btn-secondary" id="btn-reset">↺ Reset Session</button>
+        <button class="btn btn-primary" id="btn-mic">🎙️ 마이크 감지 시작 (Start Mic)</button>
+        <button class="btn btn-accent" id="btn-stream-file" style="background: linear-gradient(135deg, #ff2d68, #8b5cf6); color: #fff; font-weight: 600;">⚡ 파일 스트리밍 (Stream File)</button>
+        <button class="btn btn-secondary" id="btn-file">📁 오디오 파일 업로드 (Upload)</button>
+        <button class="btn btn-danger" id="btn-stop" disabled>⏹ 감지 중지 (Stop)</button>
+        <button class="btn btn-secondary" id="btn-challenge">🎲 난수 발화 챌린지 (Challenge)</button>
+        <button class="btn btn-secondary" id="btn-reset">↺ 세션 초기화 (Reset)</button>
         <input type="file" id="file-input" accept="audio/*" style="display:none" />
         <input type="file" id="stream-file-input" accept="audio/*" style="display:none" />
       </div>
@@ -953,7 +986,7 @@
     <!-- Full Width: Structured Decision Log -->
     <div class="panel col-full">
       <div class="panel-title">
-        <span>Real-Time Audit Log</span>
+        <span>실시간 보안 감사 로그 · AUDIT TELEMETRY</span>
         <span style="font-size: 10px; color: var(--text-muted);">DECISION TELEMETRY</span>
       </div>
       <div class="table-wrap">
@@ -961,16 +994,16 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>CM Score</th>
-              <th>Liveness</th>
-              <th>Fusion</th>
-              <th>Action</th>
-              <th>Latency</th>
-              <th>Timestamp</th>
+              <th>CM 점수</th>
+              <th>생동성</th>
+              <th>통합 위험도</th>
+              <th>보안 조치</th>
+              <th>지연시간</th>
+              <th>타임스탬프</th>
             </tr>
           </thead>
           <tbody id="log-body">
-            <tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>
+            <tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">수신된 보안 감사 텔레메트리가 없습니다 (대기 중)</td></tr>
           </tbody>
         </table>
       </div>
@@ -985,15 +1018,15 @@
   <div class="tab-pane" id="tab-batch" role="tabpanel">
     <div class="dropzone" id="batch-dropzone">
       <div class="dropzone-icon">📁</div>
-      <div class="dropzone-title">Batch Audio Clone Detection</div>
-      <div class="dropzone-sub" id="batch-dropzone-text">Drop audio files here or click to browse (WAV, MP3, FLAC, OGG, WebM)</div>
+      <div class="dropzone-title">오디오 파일 일괄 딥페이크 탐지 (Batch Audio Detection)</div>
+      <div class="dropzone-sub" id="batch-dropzone-text">오디오 파일을 여기에 드래그하거나 클릭하여 선택하십시오 (WAV, MP3, FLAC, OGG, WebM)</div>
       <input type="file" id="batch-file-input" multiple accept="audio/*,.wav,.mp3,.flac,.ogg,.webm" style="display:none;" />
     </div>
 
     <div class="batch-controls">
-      <button class="btn btn-primary" id="btn-batch-analyze">⚡ Analyze All Queued Files</button>
-      <button class="btn btn-secondary" id="btn-batch-export">📥 Export Results (CSV)</button>
-      <button class="btn btn-secondary" id="btn-batch-clear">🗑️ Clear Queue</button>
+      <button class="btn btn-primary" id="btn-batch-analyze">⚡ 대기열 전체 분석 (Analyze All)</button>
+      <button class="btn btn-secondary" id="btn-batch-export">📥 분석 결과 내보내기 (Export CSV)</button>
+      <button class="btn btn-secondary" id="btn-batch-clear">🗑️ 대기열 비우기 (Clear)</button>
       <span id="batch-summary" style="font-size: 12px; color: var(--text-muted); margin-left: auto;"></span>
     </div>
 
@@ -1022,29 +1055,29 @@
     <div class="bench-grid">
       <div class="bench-card">
         <div class="bench-card-val" id="bench-voiceguard-eer">&lt; 0.95%</div>
-        <div class="bench-card-name">VoiceGuard EER (ASVspoof 2019)</div>
-        <div class="bench-card-note">Equal Error Rate on LA partition</div>
+        <div class="bench-card-name">보이스가드 EER (ASVspoof 2019)</div>
+        <div class="bench-card-note">LA 평가 파티션 동등 에러율 (낮을수록 우수)</div>
       </div>
       <div class="bench-card">
         <div class="bench-card-val" id="bench-voiceguard-tdcf">0.024</div>
-        <div class="bench-card-name">Minimum t-DCF</div>
-        <div class="bench-card-note">Tandem Decision Cost Metric</div>
+        <div class="bench-card-name">최소 t-DCF (Min t-DCF)</div>
+        <div class="bench-card-note">직렬 결정 비용 척도</div>
       </div>
       <div class="bench-card">
         <div class="bench-card-val">&lt; 85 ms</div>
-        <div class="bench-card-name">Inference Latency</div>
-        <div class="bench-card-note">Per 1-second audio frame (Edge Web Audio)</div>
+        <div class="bench-card-name">추론 지연시간 (Latency)</div>
+        <div class="bench-card-note">1초 오디오 프레임당 엣지 처리 속도</div>
       </div>
       <div class="bench-card">
         <div class="bench-card-val">99.2%</div>
-        <div class="bench-card-name">TTS Generalization</div>
-        <div class="bench-card-note">Across ElevenLabs, OpenAI, Tortoise &amp; EdgeTTS</div>
+        <div class="bench-card-name">TTS 일반화 탐지율</div>
+        <div class="bench-card-note">ElevenLabs, OpenAI, Tortoise &amp; EdgeTTS 대상</div>
       </div>
     </div>
 
     <div class="panel" style="margin-bottom: 24px;">
       <div class="panel-header">
-        <span class="panel-title">📊 SOTA Benchmark Comparison (Equal Error Rate — Lower is Better)</span>
+        <span class="panel-title">📊 최신 SOTA 벤치마크 성능 비교 (EER — 낮을수록 우수)</span>
       </div>
       <div class="chart-container">
         <canvas id="bench-chart"></canvas>
@@ -1053,7 +1086,7 @@
 
     <div class="panel">
       <div class="panel-header">
-        <span class="panel-title">📚 Standard Anti-Spoofing Benchmark Datasets</span>
+        <span class="panel-title">📚 표준 안티-스푸핑 벤치마크 데이터셋 (Standard Datasets)</span>
       </div>
       <div class="dataset-cards">
         <div class="ds-card">
@@ -1103,7 +1136,7 @@
     <div class="about-grid">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">🛡️ System Architecture &amp; Methodology</span>
+          <span class="panel-title">🛡️ 시스템 아키텍처 및 연구 방법론 (System Architecture)</span>
         </div>
         <div style="font-size: 13px; line-height: 1.6; color: var(--text-muted);">
           <p style="margin-bottom: 12px;">
@@ -1120,7 +1153,7 @@
 
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">📖 Research References &amp; Standards</span>
+          <span class="panel-title">📖 핵심 연구 논문 및 표준 규격 (Research References)</span>
         </div>
         <div class="paper-list">
           <div class="paper-card" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
@@ -1168,10 +1201,7 @@
 
   <!-- Disclaimer -->
   <div class="disclaimer">
-    <strong>Defensive Anti-Fraud Research Prototype:</strong>
-    This system detects AI-synthesized speech; it does not generate or assist in generating synthetic voices.
-    Operates with Edge Audio Processing & Web Audio API on Vercel, with seamless connection to GPU PyTorch backends.
-    All scores represent calibrated risk estimates. Refer to <code>LIMITATIONS.md</code> for full generalization discussion.
+    <strong>🇰🇷 K-보안 방어형 안티-보이스피싱 연구 프로토타입:</strong> 본 시스템은 AI 합성 음성을 탐지하고 위조 공격을 방어하는 보안 연구 시스템입니다. 합성 음성을 생성하거나 변조를 돕지 않습니다. 엣지 오디오 프로세싱 및 Web Audio API를 기반으로 구동되며, GPU 백엔드와 실시간 연동됩니다. 모든 점수는 보정된 위험도 추정치입니다.
   </div>
 </main>
 
@@ -1330,7 +1360,7 @@ function initConnection() {
 
   const targetUrl = getWsUrl();
   if (connDot) connDot.className = 'status-dot';
-  if (connLabel) connLabel.textContent = 'Probing Backend...';
+  if (connLabel) connLabel.textContent = '백엔드 연결 확인 중...';
 
   try {
     ws = new WebSocket(targetUrl);
@@ -1347,7 +1377,7 @@ function initConnection() {
       clearTimeout(connectionTimeout);
       activeMode = 'ws';
       if (connDot) connDot.className = 'status-dot connected';
-      if (connLabel) connLabel.textContent = 'GPU Backend Connected';
+      if (connLabel) connLabel.textContent = 'GPU 백엔드 연결됨 (Connected)';
     };
 
     ws.onclose = () => {
@@ -1355,7 +1385,7 @@ function initConnection() {
       ws = null;
       if (forcedEngine === 'ws') {
         if (connDot) connDot.className = 'status-dot error';
-        if (connLabel) connLabel.textContent = 'Backend Offline';
+        if (connLabel) connLabel.textContent = '백엔드 오프라인 (Offline)';
       } else {
         setEdgeMode();
       }
@@ -1385,7 +1415,7 @@ function initConnection() {
 function setEdgeMode() {
   activeMode = 'edge';
   if (connDot) connDot.className = 'status-dot edge';
-  if (connLabel) connLabel.textContent = 'Edge Engine Active (Browser)';
+  if (connLabel) connLabel.textContent = '엣지 엔진 활성 (Edge Active)';
 }
 
 // Immediately trigger connection resolution
@@ -1421,8 +1451,14 @@ function handleScore(data) {
   // Decision Badge
   decisionBadge.className = `decision-badge decision-${dec}`;
   const icons = { ALLOW: '🟢', STEP_UP: '🟡', ALERT: '🟠', BLOCK: '🔴' };
+  const krLabels = {
+    ALLOW: '정상 음성 (ALLOW)',
+    STEP_UP: '추가 인증 (STEP-UP)',
+    ALERT: '의심 경보 (ALERT)',
+    BLOCK: '위조 차단 (BLOCK)'
+  };
   decisionBadge.children[0].textContent = icons[dec] || '⚪';
-  decisionText.textContent = dec.replace('_', ' ');
+  decisionText.textContent = krLabels[dec] || dec.replace('_', ' ');
   decisionReason.textContent = data.reason || '';
 
   // Score Bars
@@ -2573,7 +2609,7 @@ btnReset.onclick     = () => {
   spoofHistory = [];
   consecutiveAiWindows = 0;
   analystSampleCount = 0;
-  logBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">No telemetry data yet</td></tr>';
+  logBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">수신된 보안 감사 텔레메트리가 없습니다 (대기 중)</td></tr>';
   document.getElementById('met-windows').textContent = '0';
   document.getElementById('met-p50').textContent = '—';
   document.getElementById('met-p95').textContent = '—';
