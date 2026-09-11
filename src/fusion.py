@@ -48,6 +48,7 @@ class ScoreBundle:
     cm_score:          float                  # CM classifier spoof prob [0,1]
     sv_score:          Optional[float] = None # Speaker verification spoof prob [0,1]
     liveness_score:    Optional[float] = None # Liveness suspicion score [0,1]
+    replay_score:      Optional[float] = None # Cross-device replay suspicion [0,1]
     # Sub-scores from liveness
     flatness_score:    Optional[float] = None
     jitter_score:      Optional[float] = None
@@ -60,11 +61,13 @@ class ScoreBundle:
         """
         Convert to a fixed-length numpy feature vector for the fusion model.
         Missing values are imputed with NEUTRAL_SCORE.
+        Feature order: [cm_score, sv_score, liveness_score, replay_score, watermark]
         """
         sv  = self.sv_score        if self.sv_score       is not None else NEUTRAL_SCORE
         lv  = self.liveness_score  if self.liveness_score is not None else NEUTRAL_SCORE
+        rp  = self.replay_score    if self.replay_score   is not None else NEUTRAL_SCORE
         wm  = 1.0 if self.watermark_detected else 0.0
-        return np.array([self.cm_score, sv, lv, wm], dtype=np.float32)
+        return np.array([self.cm_score, sv, lv, rp, wm], dtype=np.float32)
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -150,6 +153,12 @@ class FusionModel:
             score = (cm_w * bundle.cm_score + sv_w * bundle.sv_score) / total_w
         else:
             score = bundle.cm_score
+
+        # Replay hard-upweight: explicit replay_score >= 0.60 strongly suggests
+        # a speaker attack (phone/laptop playback of AI voice).
+        if bundle.replay_score is not None and bundle.replay_score >= 0.60:
+            replay_confidence = min(1.0, (bundle.replay_score - 0.60) / 0.30)
+            score = max(score, 0.72 + 0.20 * replay_confidence)
 
         # Watermark: hard override — if detected, score -> 0.97
         if bundle.watermark_detected:

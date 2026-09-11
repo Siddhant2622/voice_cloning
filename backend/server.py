@@ -20,7 +20,7 @@ Run:
 from __future__ import annotations
 
 import asyncio
-import io
+import io  # io.BytesIO used by /api/v1/enroll
 import json
 import logging
 import os
@@ -294,6 +294,7 @@ async def analyze_file(
 def _score_waveform(wav) -> Dict:
     """Run CM + liveness + fusion synchronously (called in executor).
     Returns global + per-frame scores (Resemble AI DETECT-2B style).
+    Includes replay_score derived from bandwidth_score.
     """
     import numpy as np
     import torch
@@ -327,17 +328,29 @@ def _score_waveform(wav) -> Dict:
     except Exception as exc:
         logger.warning("Liveness analysis failed: %s", exc)
 
+    # Replay score — derived from bandwidth_score (mobile speaker playback indicator)
+    bandwidth_score = lv_result.get("bandwidth_score")
+    replay_score = None
+    if bandwidth_score is not None:
+        replay_score = float(min(1.0, max(0.0, (bandwidth_score - 0.35) / 0.45))) \
+            if bandwidth_score >= 0.35 else 0.0
+
     bundle = ScoreBundle(
         cm_score=cm_score,
         sv_score=None,
         liveness_score=liveness_score,
+        replay_score=replay_score,
         flatness_score=lv_result.get("flatness_score"),
         jitter_score=lv_result.get("jitter_score"),
         contrast_score=lv_result.get("contrast_score"),
-        bandwidth_score=lv_result.get("bandwidth_score"),
+        bandwidth_score=bandwidth_score,
     )
     fs = _models["fusion"].score(bundle)
-    ctx = RiskContext(fusion_score=fs)
+    ctx = RiskContext(
+        fusion_score   = fs,
+        liveness_score = liveness_score,
+        replay_score   = replay_score,
+    )
     decision = _models["risk"].decide(ctx)
 
     # Downsample frame scores to max 50 for network efficiency
@@ -350,11 +363,13 @@ def _score_waveform(wav) -> Dict:
     return {
         "cm_score":         round(cm_score, 4),
         "liveness_score":   round(liveness_score, 4) if liveness_score is not None else 0.05,
+        "replay_score":     round(replay_score, 4)   if replay_score   is not None else None,
         "fusion_score":     round(fs, 4),
         "decision":         decision.action.value,
         "reason":           decision.reason,
+        "contributing_signals": decision.contributing_signals,
         "frame_scores":     frame_scores_ds,
-        "suspicious_frames": suspicious_frames[:20],  # max 20 suspicious frame indices
+        "suspicious_frames": suspicious_frames[:20],
     }
 
 
@@ -369,6 +384,41 @@ async def get_benchmark():
         )
     with open(bench_path) as f:
         return JSONResponse(content=json.load(f))
+
+
+@app.post("/api/v1/enroll", tags=["Analysis"], summary="Enroll a speaker reference for SV scoring")
+async def enroll_speaker_v1(
+    speaker_id: str = "default",
+    file: UploadFile = File(...),
+    _auth = Depends(require_api_key),
+):
+    """
+    Upload a reference audio file to enroll a speaker embedding for the session.
+    Subsequent /ws/stream sessions can pass speaker_id to activate SV scoring.
+    """
+    sv = _models.get("sv")
+    if sv is None or not getattr(sv, "available", False):
+        raise HTTPException(status_code=503, detail="Speaker verifier unavailable.")
+    try:
+        import torch
+        import soundfile as sf
+        audio_bytes = await file.read()
+        buf = io.BytesIO(audio_bytes)
+        data, sr = sf.read(buf, dtype="float32", always_2d=True)
+        wav = torch.from_numpy(data.mean(axis=1))
+        if sr != 16000:
+            import torchaudio
+            wav = torchaudio.functional.resample(wav.unsqueeze(0), sr, 16000).squeeze(0)
+        from src.preprocessing import rms_normalize
+        wav = rms_normalize(wav)
+        ok = sv.enroll(speaker_id, wav)
+        if ok:
+            return {"status": "enrolled", "speaker_id": speaker_id}
+        raise HTTPException(status_code=500, detail="Enrollment failed.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @app.post("/api/challenge", tags=["Challenge"])
@@ -401,6 +451,12 @@ async def ws_stream(ws: WebSocket):
 
     Client sends raw PCM audio chunks (16-bit LE, 16 kHz, mono).
     Server responds with JSON score objects.
+
+    Prevention protocol:
+      BLOCK   → sends {"type":"blocked",...} then closes with code 1008.
+      STEP_UP → sends {"type":"step_up","challenge":{...}}.
+      ALERT   → sends {"type":"alert",...}.
+      ALLOW   → sends normal {"type":"score",...}.
     """
     await ws.accept()
     session_id = str(uuid.uuid4())
@@ -411,6 +467,9 @@ async def ws_stream(ws: WebSocket):
     audio_buffer = np.array([], dtype=np.float32)
     window = 0
     session_ema = 0.05
+
+    from src.prevention import PreventionEngine, BlockedSessionError
+    prevention = PreventionEngine()
 
     try:
         while True:
@@ -469,6 +528,7 @@ async def ws_stream(ws: WebSocket):
                         "cm_score":       0.04,
                         "liveness_score": 0.05,
                         "sv_score":       None,
+                        "replay_score":   None,
                         "fusion_score":   round(session_ema, 4),
                         "decision":       "ALLOW",
                         "reason":         "Silence / ambient room acoustics.",
@@ -479,6 +539,7 @@ async def ws_stream(ws: WebSocket):
                 try:
                     import torch
                     from src.preprocessing import rms_normalize
+                    from src.risk_engine import RiskContext
                     wav = torch.from_numpy(window_np)
                     wav = rms_normalize(wav)
 
@@ -489,21 +550,44 @@ async def ws_stream(ws: WebSocket):
                     session_ema = 0.65 * fusion + 0.35 * session_ema
                     latency = (time.time() - t0) * 1000.0
 
-                    await ws.send_json({
-                        "type":              "score",
-                        "timestamp":         datetime.now(timezone.utc).isoformat(),
-                        "window":            window,
-                        "window_index":      window,
-                        "fusion_score":      round(session_ema, 4),
-                        "cm_score":          scores["cm_score"],
-                        "liveness_score":    scores["liveness_score"],
-                        "sv_score":          None,
-                        "decision":          scores["decision"],
-                        "reason":            scores.get("reason", ""),
-                        "latency_ms":        round(latency, 1),
-                        "frame_scores":      scores.get("frame_scores", []),
-                        "suspicious_frames": scores.get("suspicious_frames", []),
-                    })
+                    # Re-run risk engine with liveness + replay signals
+                    ctx = RiskContext(
+                        fusion_score   = session_ema,
+                        liveness_score = scores.get("liveness_score"),
+                        replay_score   = scores.get("replay_score"),
+                        session_id     = session_id,
+                    )
+                    decision = _models["risk"].decide(ctx)
+
+                    try:
+                        result = prevention.apply(decision, session_id=session_id)
+                        await ws.send_json({
+                            "type":              result.action.lower(),
+                            "timestamp":         datetime.now(timezone.utc).isoformat(),
+                            "window":            window,
+                            "window_index":      window,
+                            "fusion_score":      round(session_ema, 4),
+                            "cm_score":          scores["cm_score"],
+                            "liveness_score":    scores["liveness_score"],
+                            "sv_score":          None,
+                            "replay_score":      scores.get("replay_score"),
+                            "decision":          decision.action.value,
+                            "reason":            decision.reason,
+                            "contributing_signals": decision.contributing_signals,
+                            "latency_ms":        round(latency, 1),
+                            "frame_scores":      scores.get("frame_scores", []),
+                            "suspicious_frames": scores.get("suspicious_frames", []),
+                        })
+                    except BlockedSessionError as blk:
+                        logger.warning("BLOCKING session %s score=%.4f", session_id, blk.risk_score)
+                        try:
+                            await ws.send_json(blk.to_dict())
+                            await asyncio.sleep(0.05)
+                            await ws.close(code=1008, reason=blk.reason[:123])
+                        except Exception:
+                            pass
+                        return
+
                 except Exception as exc:
                     logger.warning("Scoring error: %s", exc, exc_info=True)
                     await ws.send_json({"type": "error", "detail": str(exc)})

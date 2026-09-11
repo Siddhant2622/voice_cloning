@@ -51,6 +51,10 @@ class RiskContext:
     # Audio-side
     fusion_score:          float = 0.5        # from fusion.py [0, 1]
 
+    # Direct acoustic signals (surfaced separately from fusion for additive penalties)
+    liveness_score:        Optional[float] = None  # from liveness.py; high = suspicious
+    replay_score:          Optional[float] = None  # cross-device replay suspicion [0,1]
+
     # Call metadata                           # INTEGRATION_POINT: Telephony API / caller-ID SIP headers
     caller_id_spoofed:     bool  = False      # True if CLI/ANI appears spoofed
     geolocation_mismatch:  bool  = False      # True if call origin ≠ account's home region
@@ -140,6 +144,28 @@ class PolicyEngine:
             if getattr(ctx, flag, False):
                 score += penalty
                 signals[flag] = f"+{penalty:.2f} penalty"
+
+        # Direct liveness penalty: high liveness_score = unnaturally clean speech
+        liveness_penalty_threshold = self.config.get("liveness_penalty_threshold", 0.65)
+        liveness_penalty_weight    = self.config.get("liveness_penalty_weight", 0.15)
+        if ctx.liveness_score is not None and ctx.liveness_score >= liveness_penalty_threshold:
+            lv_penalty = liveness_penalty_weight * (
+                (ctx.liveness_score - liveness_penalty_threshold) /
+                (1.0 - liveness_penalty_threshold)
+            )
+            score += lv_penalty
+            signals["liveness_penalty"] = f"+{lv_penalty:.3f} (liveness={ctx.liveness_score:.3f})"
+
+        # Direct replay penalty: suspected cross-device audio replay
+        replay_penalty_threshold = self.config.get("replay_penalty_threshold", 0.50)
+        replay_penalty_weight    = self.config.get("replay_penalty_weight", 0.12)
+        if ctx.replay_score is not None and ctx.replay_score >= replay_penalty_threshold:
+            rp_penalty = replay_penalty_weight * (
+                (ctx.replay_score - replay_penalty_threshold) /
+                (1.0 - replay_penalty_threshold)
+            )
+            score += rp_penalty
+            signals["replay_penalty"] = f"+{rp_penalty:.3f} (replay={ctx.replay_score:.3f})"
 
         # Transaction value tier
         txn_tiers = self.config.get("transaction_risk_tiers", {})

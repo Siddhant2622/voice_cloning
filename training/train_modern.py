@@ -585,15 +585,35 @@ def train(
     replay_aug: bool = True,
     force_rebuild: bool = False,
     pretrained_checkpoint: Optional[str] = None,
+    out_model: Optional[str] = None,
+    cache_dir: Optional[str] = None,
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Auto-detect Google Drive root if present
+    import os
+    drive_root = os.environ.get("VOICEGUARD_DRIVE_ROOT", os.environ.get("DRIVE_ROOT", ""))
+    if not drive_root and Path("/content/drive/MyDrive/voiceguard").exists():
+        drive_root = "/content/drive/MyDrive/voiceguard"
+
+    if out_model is None:
+        out_model = f"{drive_root}/models/cm_detect2b_v4.pt" if drive_root else "models/cm_detect2b_v4.pt"
+    out_model_path = Path(out_model)
+    out_model_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if cache_dir is None:
+        cache_dir = f"{drive_root}/cache" if drive_root else "data"
+    cache_dir_path = Path(cache_dir)
+    cache_dir_path.mkdir(parents=True, exist_ok=True)
+
     logger.info("Device: %s | Max samples/class: %d | Epochs: %d", device, max_samples, epochs)
+    logger.info("Checkpoint out: %s | Cache dir: %s", out_model_path, cache_dir_path)
     logger.info("Codec aug: %s | Replay aug: %s | ASVspoof 2017: %s", codec_aug, replay_aug, asvspoof2017_dir)
     
     data_path = Path(data_dir)
     # v4: cache tag bumped to bust old cache after mobile_replay_chain augmentation was added
     cache_tag = f"{max_samples}_asv17_v4" if asvspoof2017_dir else f"{max_samples}_v4"
-    cache_path = Path(f"data/modern_features_cache_{cache_tag}.pt")
+    cache_path = cache_dir_path / f"modern_features_cache_{cache_tag}.pt"
     
     if cache_path.exists() and not force_rebuild:
         logger.info("Loading cached features from %s...", cache_path)
@@ -735,12 +755,27 @@ def train(
             best_eer = val_eer
             best_val_acc = val_acc
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
+            # Persist best model immediately to Drive/disk so disconnects never lose progress
+            try:
+                torch.save(best_state, str(out_model_path))
+                logger.info("✓ [Drive Saved] Best model updated: %s (EER=%.2f%%, val_acc=%.1f%%)",
+                            out_model_path, best_eer * 100, best_val_acc * 100)
+            except Exception as save_err:
+                logger.warning("Could not persist mid-training checkpoint: %s", save_err)
+
+        # Periodic rolling backup
+        if epoch % 5 == 0:
+            try:
+                rolling_path = out_model_path.with_name("cm_detect2b_latest.pt")
+                torch.save(model.state_dict(), str(rolling_path))
+            except Exception:
+                pass
     
-    # Save checkpoint
-    MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
+    # Final checkpoint save
+    out_model_path.parent.mkdir(parents=True, exist_ok=True)
     save_state = best_state if best_state is not None else model.state_dict()
-    torch.save(save_state, str(MODEL_OUT))
-    logger.info("Saved best model to %s (EER=%.2f%%, val_acc=%.1f%%)", MODEL_OUT, best_eer * 100, best_val_acc * 100)
+    torch.save(save_state, str(out_model_path))
+    logger.info("Saved final best model to %s (EER=%.2f%%, val_acc=%.1f%%)", out_model_path, best_eer * 100, best_val_acc * 100)
     
     # Save metadata
     meta = {
@@ -760,13 +795,13 @@ def train(
         "training_datasets": ["librispeech", "mlaad", "in-the-wild", "wavefake", "asvspoof2017_v2"],
         "presentation_gap_mitigation": "ASVspoof 2017 V2 Physical Microphones (R01-R25) + Codec Aug + Replay Aug",
     }
-    with open(MODEL_OUT.with_suffix(".json"), "w") as fp:
+    with open(out_model_path.with_suffix(".json"), "w") as fp:
         json.dump(meta, fp, indent=2)
     
     print("\n" + "=" * 60)
     print("TRAINING SUCCESSFUL!")
     print("=" * 60)
-    print(f"  Model:        {MODEL_OUT}")
+    print(f"  Model:        {out_model_path}")
     print(f"  Val Accuracy: {best_val_acc * 100:.1f}%")
     print(f"  EER:          {best_eer * 100:.2f}%")
     print(f"  Codec Aug:    {codec_aug}")
@@ -792,6 +827,8 @@ if __name__ == "__main__":
     parser.add_argument("--force-rebuild", action="store_true", help="Force rebuilding feature cache")
     parser.add_argument("--pretrained-checkpoint", default="models/cm_detect2b_v3_pre_asv17_backup.pt", help="Path to warm-start checkpoint")
     parser.add_argument("--no-warm-start", action="store_true", help="Train from scratch without warm-starting")
+    parser.add_argument("--out", default=None, help="Output checkpoint path (defaults to Drive if mounted)")
+    parser.add_argument("--cache-dir", default=None, help="Feature cache directory (defaults to Drive/cache if mounted)")
     args = parser.parse_args()
     
     asv_dir = None if args.no_asvspoof2017 else args.asvspoof2017_dir
@@ -806,4 +843,6 @@ if __name__ == "__main__":
         replay_aug=args.replay_aug,
         force_rebuild=args.force_rebuild,
         pretrained_checkpoint=pretrained,
+        out_model=args.out,
+        cache_dir=args.cache_dir,
     )

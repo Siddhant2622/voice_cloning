@@ -304,6 +304,20 @@ def main():
     parser.add_argument("--frame-weight",     type=float, default=0.2,  help="Weight of frame-level auxiliary loss.")
     args = parser.parse_args()
 
+    # Auto-detect Google Drive root if present
+    import os
+    drive_root = os.environ.get("VOICEGUARD_DRIVE_ROOT", os.environ.get("DRIVE_ROOT", ""))
+    if not drive_root and Path("/content/drive/MyDrive/voiceguard").exists():
+        drive_root = "/content/drive/MyDrive/voiceguard"
+
+    if drive_root:
+        if args.out == "models/cm.pt":
+            args.out = f"{drive_root}/models/cm.pt"
+        if args.cache == "data/features_cache.pt":
+            args.cache = f"{drive_root}/cache/features_cache.pt"
+        if args.data == "data/samples" and Path(f"{drive_root}/data/samples").exists():
+            args.data = f"{drive_root}/data/samples"
+
     import torch
     import torch.nn as nn
     from torch.utils.data import TensorDataset, DataLoader, random_split
@@ -507,6 +521,15 @@ def main():
             best_val_acc  = overall_acc
             best_state    = {k: v.clone() for k, v in model.state_dict().items()}
             no_improve    = 0
+            # Persist best model immediately to Drive/disk so progress survives disconnects
+            try:
+                out_path = Path(args.out)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                torch.save(best_state, str(out_path))
+                logger.info("✓ [Drive Saved] Best model updated: %s (val_loss=%.4f, val_acc=%.1f%%)",
+                            out_path, best_val_loss, best_val_acc * 100)
+            except Exception as save_err:
+                logger.debug("Could not persist mid-training checkpoint: %s", save_err)
         else:
             no_improve += 1
             if no_improve >= patience and epoch >= 40:

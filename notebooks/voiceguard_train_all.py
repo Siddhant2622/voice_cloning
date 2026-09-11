@@ -41,10 +41,22 @@ try:
     drive.mount('/content/drive')
     DRIVE_ROOT = "/content/drive/MyDrive/voiceguard"
     os.makedirs(DRIVE_ROOT, exist_ok=True)
-    print(f"✓ Drive mounted → {DRIVE_ROOT}")
+    os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/cache", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/data", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/results", exist_ok=True)
+    os.environ["VOICEGUARD_DRIVE_ROOT"] = DRIVE_ROOT
+    os.environ["DRIVE_ROOT"] = DRIVE_ROOT
+    print(f"✓ Drive mounted and persistent directories initialized → {DRIVE_ROOT}")
 except ImportError:
     DRIVE_ROOT = "/content/voiceguard_data"
     os.makedirs(DRIVE_ROOT, exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/cache", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/data", exist_ok=True)
+    os.makedirs(f"{DRIVE_ROOT}/results", exist_ok=True)
+    os.environ["VOICEGUARD_DRIVE_ROOT"] = DRIVE_ROOT
+    os.environ["DRIVE_ROOT"] = DRIVE_ROOT
     print(f"⚠ Not in Colab, using local path: {DRIVE_ROOT}")
 
 # ── Step 2: Clone repo ────────────────────────────────────────────────────────
@@ -63,7 +75,7 @@ os.system("pip install -q -r requirements.txt 2>&1")
 print(f"✓ Repo ready at {REPO_DIR}")
 
 # ── Step 3: Download ASVspoof 2019 LA ─────────────────────────────────────────
-print("\n[4/7] Downloading ASVspoof 2019 LA dataset (~2.6 GB)...")
+print("\n[4/7] Checking/Downloading ASVspoof 2019 LA dataset (~2.6 GB on Drive)...")
 DATA_DIR = f"{DRIVE_ROOT}/asvspoof2019_la"
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -83,42 +95,47 @@ def dl_progress(block, bsize, total):
 for fname in FILES:
     dest = f"{DATA_DIR}/{fname}"
     if os.path.exists(dest):
-        print(f"  ✓ Already downloaded: {fname}")
+        print(f"  ✓ Already cached on Drive: {fname}")
         continue
-    print(f"  Downloading {fname}...")
+    print(f"  Downloading {fname} to Drive...")
     urllib.request.urlretrieve(f"{ZENODO}{fname}", dest, reporthook=dl_progress)
     print(f"\n  ✓ {fname} done")
 
-print("  Extracting archives...")
+print("  Extracting archives on Drive if needed...")
 for fname in FILES:
     path = f"{DATA_DIR}/{fname}"
     if os.path.exists(path):
         with zipfile.ZipFile(path, "r") as z:
             z.extractall(DATA_DIR)
-print("✓ Dataset ready!")
+print("✓ Dataset ready on Drive!")
 
 # ── Step 4: Prepare dataset (protocol → CSV) ──────────────────────────────────
-print("\n[5/7] Preparing dataset...")
-result = subprocess.run([
-    "python", "data/prepare_asvspoof.py",
-    "--dir",   f"{DATA_DIR}",
-    "--out",   f"{DRIVE_ROOT}/asvspoof2019_prepared",
-    "--split", "all",
-])
-if result.returncode != 0:
-    print("ERROR: Data preparation failed.")
-    sys.exit(1)
-print("✓ Dataset prepared!")
+print("\n[5/7] Preparing dataset on Drive...")
+PREPARED_DIR = f"{DRIVE_ROOT}/asvspoof2019_prepared"
+if not (Path(PREPARED_DIR) / "train" / "samples_metadata.csv").exists():
+    result = subprocess.run([
+        "python", "data/prepare_asvspoof.py",
+        "--dir",   f"{DATA_DIR}",
+        "--out",   PREPARED_DIR,
+        "--split", "all",
+    ])
+    if result.returncode != 0:
+        print("ERROR: Data preparation failed.")
+        sys.exit(1)
+    print("✓ Dataset prepared on Drive!")
+else:
+    print(f"✓ Prepared CSVs already exist on Drive: {PREPARED_DIR}")
 
 # ── Step 5: Train CM classifier ───────────────────────────────────────────────
-print("\n[6/7] Training CM classifier (this takes ~3 hours on T4 GPU)...")
-print("      Checkpoint saves to Google Drive so you can disconnect safely.")
+print("\n[6/7] Training CM classifier...")
+print(f"      Checkpoints & feature caches save to Google Drive ({DRIVE_ROOT}) continuously.")
 OUT_MODEL = f"{DRIVE_ROOT}/models/cm_asvspoof19.pt"
-os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
+CACHE_PATH = f"{DRIVE_ROOT}/cache/features_cache.pt"
 
 result = subprocess.run([
     "python", "training/train_cm.py",
-    "--data",      f"{DRIVE_ROOT}/asvspoof2019_prepared/train",
+    "--data",      f"{PREPARED_DIR}/train",
+    "--cache",     CACHE_PATH,
     "--val-split", "0.1",
     "--epochs",    "50",
     "--lr",        "0.0003",
@@ -130,20 +147,20 @@ if result.returncode != 0:
     sys.exit(1)
 
 size_mb = os.path.getsize(OUT_MODEL) / 1e6
-print(f"✓ Training done! Checkpoint: {OUT_MODEL} ({size_mb:.1f} MB)")
+print(f"✓ Training done! Checkpoint saved persistently to Drive: {OUT_MODEL} ({size_mb:.1f} MB)")
 
 # ── Step 6: Evaluate EER ──────────────────────────────────────────────────────
 print("\n  Evaluating EER on eval partition...")
-os.makedirs("results", exist_ok=True)
+RESULT_JSON = f"{DRIVE_ROOT}/results/benchmark_asvspoof19.json"
 subprocess.run([
     "python", "training/eval_eer.py",
-    "--data",       f"{DRIVE_ROOT}/asvspoof2019_prepared/eval",
+    "--data",       f"{PREPARED_DIR}/eval",
     "--checkpoint", OUT_MODEL,
-    "--out",        "results/benchmark_asvspoof19.json",
+    "--out",        RESULT_JSON,
     "--dataset",    "asvspoof2019_la_eval",
 ])
-if os.path.exists("results/benchmark_asvspoof19.json"):
-    with open("results/benchmark_asvspoof19.json") as f:
+if os.path.exists(RESULT_JSON):
+    with open(RESULT_JSON) as f:
         res = json.load(f)
     print(f"  EER: {res.get('eer')}%  |  min-tDCF: {res.get('min_tDCF')}")
 

@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceGuard Live — Real-Time AI Voice Detection</title>
+  <meta name="description" content="Real-time microphone-based AI voice clone detection. Human voices are allowed; AI-cloned voices are actively blocked." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Design Tokens ───────────────────────────────────────────── */
+    :root {
+      --bg:          #050911;
+      --bg2:         rgba(10, 18, 36, 0.92);
+      --bg3:         rgba(16, 26, 50, 0.75);
+      --border:      rgba(70, 130, 240, 0.16);
+      --border-hi:   rgba(70, 130, 240, 0.45);
+      --accent:      #4d87f5;
+      --accent-glow: rgba(77, 135, 245, 0.35);
+      --text:        #dde4f4;
+      --muted:       #6a7a9e;
+      --green:       #22d98a;
+      --green-glow:  rgba(34, 217, 138, 0.30);
+      --amber:       #f5c118;
+      --amber-glow:  rgba(245, 193, 24, 0.28);
+      --orange:      #f47c3c;
+      --orange-glow: rgba(244, 124, 60, 0.28);
+      --red:         #f0344f;
+      --red-glow:    rgba(240, 52, 79, 0.38);
+      --r:           14px;
+      --r-sm:        8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated Background ─────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 90% 60% at 15% 5%,  rgba(77,135,245,0.11) 0%, transparent 55%),
+        radial-gradient(ellipse 65% 50% at 85% 95%,  rgba(34,217,138,0.07) 0%, transparent 50%),
+        radial-gradient(ellipse 70% 45% at 50% 50%,  rgba(240,52,79,0.04)  0%, transparent 60%);
+      pointer-events: none; z-index: 0;
+    }
+
+    main {
+      position: relative; z-index: 1;
+      max-width: 1080px; margin: 0 auto;
+      padding: 24px 20px 80px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0 28px; flex-wrap: wrap; gap: 14px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 46px; height: 46px; border-radius: 13px;
+      background: linear-gradient(135deg, #4d87f5 0%, #22d98a 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 22px var(--accent-glow);
+    }
+    .logo h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo h1 span { color: var(--accent); }
+    .header-badge {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.6px;
+      text-transform: uppercase; color: var(--muted);
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .conn-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--muted);
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 7px 14px; border-radius: 20px;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted); transition: all 0.4s;
+    }
+    .dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+    .dot.error     { background: var(--red);   box-shadow: 0 0 8px var(--red-glow); }
+
+    /* ── Main Decision Banner ────────────────────────────────────── */
+    #decision-banner {
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px 32px;
+      border-radius: var(--r); border: 1px solid var(--border);
+      background: var(--bg2);
+      margin-bottom: 24px;
+      transition: all 0.4s ease;
+      min-height: 96px;
+    }
+    #decision-banner.allow  { border-color: var(--green); box-shadow: 0 0 32px rgba(34,217,138,0.12); }
+    #decision-banner.block  { border-color: var(--red);   box-shadow: 0 0 40px rgba(240,52,79,0.20); }
+    #decision-banner.stepup { border-color: var(--amber); box-shadow: 0 0 32px rgba(245,193,24,0.15); }
+    #decision-banner.alert  { border-color: var(--orange); box-shadow: 0 0 32px rgba(244,124,60,0.15); }
+    #decision-banner.idle   { border-color: var(--border); }
+    #decision-banner.enrolling { border-color: var(--accent); box-shadow: 0 0 24px var(--accent-glow); }
+
+    .banner-icon { font-size: 42px; line-height: 1; transition: all 0.3s; }
+    .banner-text { text-align: left; }
+    .banner-label {
+      font-size: 26px; font-weight: 800; letter-spacing: -0.5px;
+      transition: color 0.3s;
+    }
+    .banner-reason {
+      font-size: 13px; color: var(--muted); margin-top: 4px;
+      max-width: 520px; line-height: 1.4;
+    }
+    .allow  .banner-label { color: var(--green); }
+    .block  .banner-label { color: var(--red); }
+    .stepup .banner-label { color: var(--amber); }
+    .alert  .banner-label { color: var(--orange); }
+    .idle   .banner-label { color: var(--muted); }
+    .enrolling .banner-label { color: var(--accent); }
+
+    /* ── Waveform + Controls Row ─────────────────────────────────── */
+    .controls-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 20px; align-items: center; margin-bottom: 24px;
+    }
+    @media (max-width: 640px) { .controls-row { grid-template-columns: 1fr; } }
+
+    .waveform-wrap {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); overflow: hidden;
+      height: 90px; position: relative;
+    }
+    #waveform-canvas { width: 100%; height: 100%; display: block; }
+    .waveform-label {
+      position: absolute; top: 8px; left: 12px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.6px;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    .mic-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #mic-btn {
+      width: 74px; height: 74px; border-radius: 50%;
+      border: none; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent) 0%, #6a5af5 100%);
+      color: #fff; font-size: 28px;
+      box-shadow: 0 0 0 0 var(--accent-glow);
+      transition: transform 0.15s, box-shadow 0.3s;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    #mic-btn:hover { transform: scale(1.05); }
+    #mic-btn.recording {
+      background: linear-gradient(135deg, var(--red) 0%, #c0183b 100%);
+      animation: pulse-ring 1.4s ease infinite;
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(240,52,79,0.5); }
+      70%  { box-shadow: 0 0 0 18px rgba(240,52,79,0); }
+      100% { box-shadow: 0 0 0 0 rgba(240,52,79,0); }
+    }
+    #mic-label { font-size: 11px; color: var(--muted); }
+
+    /* ── Metrics Grid ────────────────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 24px;
+    }
+    .metric-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px;
+      transition: border-color 0.3s;
+    }
+    .metric-card:hover { border-color: var(--border-hi); }
+    .metric-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+    }
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px; font-weight: 700; color: var(--text);
+      margin-bottom: 8px;
+    }
+    .metric-bar-bg {
+      height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.08); overflow: hidden;
+    }
+    .metric-bar {
+      height: 100%; border-radius: 3px;
+      transition: width 0.4s ease, background 0.4s;
+      background: var(--accent);
+    }
+
+    /* ── Signal Details ──────────────────────────────────────────── */
+    .signal-row {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .signal-row h2 {
+      font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+    }
+    .signal-list { display: flex; flex-direction: column; gap: 10px; }
+    .signal-item { display: flex; align-items: center; gap: 12px; }
+    .signal-name {
+      font-size: 12px; color: var(--muted); min-width: 130px;
+      font-weight: 500;
+    }
+    .signal-bar-bg {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: rgba(255,255,255,0.07); overflow: hidden;
+    }
+    .signal-bar {
+      height: 100%; border-radius: 4px;
+      transition: width 0.5s ease, background 0.5s;
+    }
+    .signal-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--text); min-width: 42px; text-align: right;
+    }
+
+    /* ── Challenge Panel ─────────────────────────────────────────── */
+    #challenge-panel {
+      display: none;
+      background: var(--bg2); border: 1px solid var(--amber);
+      border-radius: var(--r); padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 0 24px rgba(245,193,24,0.10);
+    }
+    #challenge-panel.visible { display: block; }
+    .challenge-header {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; font-weight: 700; color: var(--amber); margin-bottom: 12px;
+    }
+    .challenge-phrase {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px; font-weight: 600; color: var(--text);
+      letter-spacing: 3px; padding: 12px 0;
+    }
+    .challenge-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* ── Log Table ───────────────────────────────────────────────── */
+    .log-section {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px 20px; margin-bottom: 24px;
+    }
+    .log-section h2 {
+      font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+    }
+    .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .log-table th {
+      text-align: left; padding: 6px 10px;
+      color: var(--muted); font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    .log-table td {
+      padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .dec-allow  { color: var(--green); font-weight: 600; }
+    .dec-block  { color: var(--red);   font-weight: 700; }
+    .dec-stepup { color: var(--amber); font-weight: 600; }
+    .dec-alert  { color: var(--orange); font-weight: 600; }
+
+    /* ── BLOCKED Overlay ─────────────────────────────────────────── */
+    #blocked-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(5,9,17,0.96);
+      backdrop-filter: blur(12px);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 24px;
+      animation: fadeIn 0.3s ease;
+    }
+    #blocked-overlay.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .blocked-card {
+      background: var(--bg2); border: 2px solid var(--red);
+      border-radius: 22px; padding: 40px 48px;
+      text-align: center; max-width: 520px;
+      box-shadow: 0 0 80px rgba(240,52,79,0.35), 0 0 160px rgba(240,52,79,0.10);
+      animation: blocked-pulse 2s ease infinite;
+    }
+    @keyframes blocked-pulse {
+      0%, 100% { box-shadow: 0 0 80px rgba(240,52,79,0.35), 0 0 160px rgba(240,52,79,0.10); }
+      50%       { box-shadow: 0 0 100px rgba(240,52,79,0.55), 0 0 200px rgba(240,52,79,0.18); }
+    }
+    .blocked-icon { font-size: 72px; line-height: 1; margin-bottom: 16px; }
+    .blocked-title {
+      font-size: 32px; font-weight: 800; color: var(--red);
+      letter-spacing: -0.5px; margin-bottom: 10px;
+    }
+    .blocked-subtitle { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    .blocked-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--text); margin-bottom: 28px;
+    }
+    .blocked-reason {
+      font-size: 13px; color: var(--muted); margin-bottom: 28px;
+      line-height: 1.6; max-width: 380px; margin-inline: auto;
+    }
+    .btn-retry {
+      background: var(--red); color: #fff;
+      border: none; padding: 13px 32px;
+      border-radius: 30px; font-size: 14px; font-weight: 700;
+      cursor: pointer; letter-spacing: 0.3px;
+      transition: transform 0.15s, opacity 0.2s;
+    }
+    .btn-retry:hover { transform: scale(1.04); opacity: 0.92; }
+
+    /* ── Enroll Section ──────────────────────────────────────────── */
+    .enroll-section {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .enroll-section h2 {
+      font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+    }
+    .enroll-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .enroll-row input[type="file"] {
+      font-size: 12px; color: var(--muted);
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 7px 12px; flex: 1;
+    }
+    .btn-enroll {
+      background: var(--accent); color: #fff;
+      border: none; padding: 9px 20px;
+      border-radius: 30px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    .btn-enroll:hover { opacity: 0.88; }
+    #enroll-status { font-size: 12px; color: var(--muted); width: 100%; }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center; font-size: 11px; color: var(--muted);
+      padding-top: 20px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+
+<body>
+  <!-- ── BLOCKED Overlay ──────────────────────────────────────────── -->
+  <div id="blocked-overlay" role="alertdialog" aria-modal="true" aria-labelledby="blocked-title">
+    <div class="blocked-card">
+      <div class="blocked-icon">🚫</div>
+      <div class="blocked-title" id="blocked-title">AI Voice Detected</div>
+      <div class="blocked-subtitle">This session has been terminated</div>
+      <div class="blocked-score" id="blocked-score">Risk Score: —</div>
+      <div class="blocked-reason" id="blocked-reason"></div>
+      <button class="btn-retry" id="btn-retry" onclick="retrySession()">Try Again with Mic</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- ── Header ──────────────────────────────────────────────────── -->
+    <header>
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <h1>Voice<span>Guard</span> Live</h1>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div class="header-badge">Real-Time AI Detection</div>
+        <div class="conn-status">
+          <div class="dot" id="conn-dot"></div>
+          <span id="conn-label">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Decision Banner ─────────────────────────────────────────── -->
+    <div id="decision-banner" class="idle">
+      <div class="banner-icon" id="banner-icon">🎙️</div>
+      <div class="banner-text">
+        <div class="banner-label" id="banner-label">Ready</div>
+        <div class="banner-reason" id="banner-reason">Press the mic button to begin real-time analysis.</div>
+      </div>
+    </div>
+
+    <!-- ── Waveform + Mic Button ──────────────────────────────────── -->
+    <div class="controls-row">
+      <div class="waveform-wrap">
+        <canvas id="waveform-canvas"></canvas>
+        <span class="waveform-label">Live Waveform</span>
+      </div>
+      <div class="mic-btn-wrap">
+        <button id="mic-btn" onclick="toggleMic()" title="Start / Stop microphone">🎙️</button>
+        <span id="mic-label">Start Mic</span>
+      </div>
+    </div>
+
+    <!-- ── Metrics Grid ────────────────────────────────────────────── -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Fusion Score</div>
+        <div class="metric-value" id="m-fusion">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-fusion" style="width:0"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CM Spoof Score</div>
+        <div class="metric-value" id="m-cm">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-cm" style="width:0"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Liveness Score</div>
+        <div class="metric-value" id="m-lv">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-lv" style="width:0"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Speaker Verify</div>
+        <div class="metric-value" id="m-sv">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-sv" style="width:0"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Replay Score</div>
+        <div class="metric-value" id="m-rp">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-rp" style="width:0"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Latency</div>
+        <div class="metric-value" id="m-lat">—</div>
+        <div class="metric-bar-bg"><div class="metric-bar" id="b-lat" style="width:0;background:var(--accent)"></div></div>
+      </div>
+    </div>
+
+    <!-- ── Challenge Panel ────────────────────────────────────────── -->
+    <div id="challenge-panel">
+      <div class="challenge-header">⚠️ Step-Up Verification Required</div>
+      <div class="challenge-phrase" id="challenge-text"></div>
+      <div class="challenge-hint">Please speak the phrase/digits shown above clearly into your microphone.</div>
+    </div>
+
+    <!-- ── Signal Details ─────────────────────────────────────────── -->
+    <div class="signal-row">
+      <h2>Signal Breakdown</h2>
+      <div class="signal-list">
+        <div class="signal-item">
+          <span class="signal-name">CM Spoof Score</span>
+          <div class="signal-bar-bg"><div class="signal-bar" id="sb-cm" style="width:0;background:var(--accent)"></div></div>
+          <span class="signal-val" id="sv-cm">—</span>
+        </div>
+        <div class="signal-item">
+          <span class="signal-name">Liveness (passive)</span>
+          <div class="signal-bar-bg"><div class="signal-bar" id="sb-lv" style="width:0;background:var(--amber)"></div></div>
+          <span class="signal-val" id="sv-lv">—</span>
+        </div>
+        <div class="signal-item">
+          <span class="signal-name">Speaker Verify (SV)</span>
+          <div class="signal-bar-bg"><div class="signal-bar" id="sb-sv" style="width:0;background:var(--orange)"></div></div>
+          <span class="signal-val" id="sv-sv">—</span>
+        </div>
+        <div class="signal-item">
+          <span class="signal-name">Replay Suspicion</span>
+          <div class="signal-bar-bg"><div class="signal-bar" id="sb-rp" style="width:0;background:var(--red)"></div></div>
+          <span class="signal-val" id="sv-rp">—</span>
+        </div>
+        <div class="signal-item">
+          <span class="signal-name">Fusion (combined)</span>
+          <div class="signal-bar-bg"><div class="signal-bar" id="sb-fs" style="width:0;background:var(--green)"></div></div>
+          <span class="signal-val" id="sv-fs">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Enroll Section ─────────────────────────────────────────── -->
+    <div class="enroll-section">
+      <h2>Manual Speaker Enrollment (optional)</h2>
+      <div class="enroll-row">
+        <input type="file" id="enroll-file" accept=".wav,.flac,.mp3" />
+        <button class="btn-enroll" onclick="enrollSpeaker()">Enroll Reference Voice</button>
+        <span id="enroll-status">Upload a WAV/FLAC of your voice to enable speaker verification.</span>
+      </div>
+    </div>
+
+    <!-- ── Decision Log ───────────────────────────────────────────── -->
+    <div class="log-section">
+      <h2>Decision Log</h2>
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Decision</th>
+            <th>Fusion</th>
+            <th>CM</th>
+            <th>Liveness</th>
+            <th>SV</th>
+            <th>Replay</th>
+            <th>Latency</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">No data yet. Start the microphone to begin.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer>
+      VoiceGuard Live &mdash; Real-Time AI Voice Clone Detection &bull;
+      <a href="/api/v1/docs" target="_blank">API Docs</a> &bull;
+      <a href="/health" target="_blank">Health</a>
+    </footer>
+  </main>
+
+  <script>
+    /* ── Configuration ───────────────────────────────────────────── */
+    const WS_URL = (() => {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      return `${proto}://${location.host}/ws/mic-stream`;
+    })();
+    const TARGET_SR    = 16000;
+    const CHUNK_SIZE   = TARGET_SR / 4;   // 250 ms send chunks
+
+    /* ── State ───────────────────────────────────────────────────── */
+    let ws          = null;
+    let audioCtx    = null;
+    let micStream   = null;
+    let scriptProc  = null;
+    let analyser    = null;
+    let recording   = false;
+    let windowCount = 0;
+    let logRows     = [];   // ring-buffer for log table
+
+    /* ── DOM refs ────────────────────────────────────────────────── */
+    const micBtn      = document.getElementById('mic-btn');
+    const micLabel    = document.getElementById('mic-label');
+    const connDot     = document.getElementById('conn-dot');
+    const connLabel   = document.getElementById('conn-label');
+    const banner      = document.getElementById('decision-banner');
+    const bannerIcon  = document.getElementById('banner-icon');
+    const bannerLabel = document.getElementById('banner-label');
+    const bannerReason= document.getElementById('banner-reason');
+    const logBody     = document.getElementById('log-body');
+    const overlay     = document.getElementById('blocked-overlay');
+    const challengePanel = document.getElementById('challenge-panel');
+    const challengeText  = document.getElementById('challenge-text');
+    const canvas      = document.getElementById('waveform-canvas');
+    const ctx2d       = canvas.getContext('2d');
+
+    /* ── Colour helper ───────────────────────────────────────────── */
+    function scoreColor(score) {
+      if (score == null) return 'var(--muted)';
+      if (score < 0.35)  return 'var(--green)';
+      if (score < 0.55)  return 'var(--amber)';
+      if (score < 0.75)  return 'var(--orange)';
+      return 'var(--red)';
+    }
+
+    function decisionClass(dec) {
+      if (!dec) return 'idle';
+      const d = dec.toUpperCase();
+      if (d === 'ALLOW')   return 'allow';
+      if (d === 'BLOCK')   return 'block';
+      if (d === 'STEP_UP') return 'stepup';
+      if (d === 'ALERT')   return 'alert';
+      return 'idle';
+    }
+
+    /* ── Bar update helper ───────────────────────────────────────── */
+    function setBar(barId, valId, metId, value, maxVal, color) {
+      const pct = value != null ? Math.min(100, (value / maxVal) * 100).toFixed(1) : 0;
+      const disp = value != null ? value.toFixed(3) : '—';
+      if (barId) {
+        const el = document.getElementById(barId);
+        if (el) { el.style.width = pct + '%'; el.style.background = color || scoreColor(value); }
+      }
+      if (valId) {
+        const el = document.getElementById(valId);
+        if (el) el.textContent = disp;
+      }
+      if (metId) {
+        const el = document.getElementById(metId);
+        if (el) el.textContent = disp;
+      }
+    }
+
+    /* ── Connection management ───────────────────────────────────── */
+    function connectWS() {
+      if (ws) { try { ws.close(); } catch(_) {} }
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        connDot.className   = 'dot connected';
+        connLabel.textContent = 'Connected';
+      };
+
+      ws.onclose = (ev) => {
+        connDot.className   = 'dot error';
+        connLabel.textContent = `Disconnected (${ev.code})`;
+        // Code 1008 = policy violation = blocked
+        if (ev.code === 1008) showBlockedOverlay(lastBlockFrame);
+      };
+
+      ws.onerror = () => {
+        connDot.className   = 'dot error';
+        connLabel.textContent = 'Error';
+      };
+
+      ws.onmessage = (ev) => {
+        let frame;
+        try { frame = JSON.parse(ev.data); } catch(_) { return; }
+        handleFrame(frame);
+      };
+    }
+
+    let lastBlockFrame = null;
+
+    function handleFrame(f) {
+      const t = f.type || '';
+
+      if (t === 'enrolling') {
+        setBanner('enrolling', '⏳', 'Enrolling Speaker...', f.message || '');
+        return;
+      }
+      if (t === 'info') {
+        if (f.message && f.message.includes('enrolled')) {
+          setBanner('enrolling', '✅', 'Speaker Enrolled', f.message);
+        }
+        return;
+      }
+      if (t === 'blocked') {
+        lastBlockFrame = f;
+        showBlockedOverlay(f);
+        stopMic();
+        return;
+      }
+      if (t === 'step_up') {
+        setBanner('stepup', '⚠️', '⚠️ Step-Up Required',
+          f.reason || 'Additional verification required.');
+        showChallenge(f.challenge);
+        appendLog(f.decision || 'STEP_UP', f);
+        updateMetrics(f);
+        return;
+      }
+      if (t === 'alert') {
+        setBanner('alert', '🔔', '🔔 Alert — Suspicious Voice',
+          f.reason || 'Human fraud agent alerted.');
+        appendLog('ALERT', f);
+        updateMetrics(f);
+        return;
+      }
+      if (t === 'score' || t === 'allow') {
+        const dec = (f.decision || 'ALLOW').toUpperCase();
+        challengePanel.classList.remove('visible');
+        const icons = { ALLOW:'✅', BLOCK:'🚫', STEP_UP:'⚠️', ALERT:'🔔' };
+        const labels = {
+          ALLOW: '✅ Human Voice Allowed',
+          BLOCK: '🚫 AI Voice Blocked',
+          STEP_UP: '⚠️ Step-Up Verification',
+          ALERT: '🔔 Suspicious — Alerting',
+        };
+        setBanner(decisionClass(dec),
+          icons[dec] || '🎙️',
+          labels[dec] || dec,
+          f.reason || '');
+        appendLog(dec, f);
+        updateMetrics(f);
+      }
+      if (t === 'pong') return;
+    }
+
+    function setBanner(cls, icon, label, reason) {
+      banner.className = cls;
+      bannerIcon.textContent = icon;
+      bannerLabel.textContent = label;
+      bannerReason.textContent = reason;
+    }
+
+    function updateMetrics(f) {
+      const fs = f.fusion_score;
+      const cm = f.cm_score;
+      const lv = f.liveness_score;
+      const sv = f.sv_score;
+      const rp = f.replay_score;
+      const lt = f.latency_ms;
+
+      setBar('b-fusion','m-fusion',null, fs, 1, scoreColor(fs));
+      setBar('b-cm','m-cm',null,         cm, 1, scoreColor(cm));
+      setBar('b-lv','m-lv',null,         lv, 1, scoreColor(lv));
+      setBar('b-sv','m-sv',null,         sv, 1, scoreColor(sv));
+      setBar('b-rp','m-rp',null,         rp, 1, scoreColor(rp));
+
+      const latPct = lt != null ? Math.min(100, lt / 10) : 0;
+      const latEl = document.getElementById('b-lat');
+      if (latEl) { latEl.style.width = latPct + '%'; }
+      const latVal = document.getElementById('m-lat');
+      if (latVal) latVal.textContent = lt != null ? lt.toFixed(0) + ' ms' : '—';
+
+      // Signal bars
+      setBar('sb-cm','sv-cm',null, cm, 1, scoreColor(cm));
+      setBar('sb-lv','sv-lv',null, lv, 1, scoreColor(lv));
+      setBar('sb-sv','sv-sv',null, sv, 1, scoreColor(sv));
+      setBar('sb-rp','sv-rp',null, rp, 1, scoreColor(rp));
+      setBar('sb-fs','sv-fs',null, fs, 1, scoreColor(fs));
+    }
+
+    function showChallenge(ch) {
+      if (!ch) return;
+      challengePanel.classList.add('visible');
+      challengeText.textContent = ch.digits || ch.phrase || '';
+    }
+
+    /* ── BLOCK overlay ───────────────────────────────────────────── */
+    function showBlockedOverlay(f) {
+      document.getElementById('blocked-score').textContent =
+        `Risk Score: ${f && f.risk_score != null ? f.risk_score.toFixed(4) : '—'}`;
+      document.getElementById('blocked-reason').textContent =
+        (f && f.reason) ? f.reason : 'High-confidence synthetic speech detected.';
+      overlay.classList.add('show');
+    }
+
+    function retrySession() {
+      overlay.classList.remove('show');
+      lastBlockFrame = null;
+      challengePanel.classList.remove('visible');
+      setBanner('idle','🎙️','Ready','Press the mic button to begin real-time analysis.');
+      // Clear metrics
+      ['fusion','cm','lv','sv','rp'].forEach(k => {
+        document.getElementById('m-'+k).textContent = '—';
+        document.getElementById('b-'+k).style.width = '0';
+      });
+      document.getElementById('m-lat').textContent = '—';
+      logRows = [];
+      logBody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Session reset. Start the microphone to begin.</td></tr>';
+    }
+
+    /* ── Decision Log ────────────────────────────────────────────── */
+    function appendLog(dec, f) {
+      windowCount++;
+      logRows.unshift({ n: windowCount, dec, f });
+      if (logRows.length > 50) logRows.pop();
+      renderLog();
+    }
+
+    function renderLog() {
+      const decCls = { ALLOW:'dec-allow', BLOCK:'dec-block', STEP_UP:'dec-stepup', ALERT:'dec-alert' };
+      logBody.innerHTML = logRows.map(r => {
+        const f = r.f;
+        const cls = decCls[r.dec] || '';
+        const fmtVal = v => v != null ? v.toFixed(3) : '—';
+        return `<tr>
+          <td>${r.n}</td>
+          <td class="${cls}">${r.dec}</td>
+          <td>${fmtVal(f.fusion_score)}</td>
+          <td>${fmtVal(f.cm_score)}</td>
+          <td>${fmtVal(f.liveness_score)}</td>
+          <td>${fmtVal(f.sv_score)}</td>
+          <td>${fmtVal(f.replay_score)}</td>
+          <td>${f.latency_ms != null ? f.latency_ms.toFixed(0)+' ms' : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    /* ── Mic capture ─────────────────────────────────────────────── */
+    async function toggleMic() {
+      if (recording) { stopMic(); return; }
+      await startMic();
+    }
+
+    async function startMic() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch(e) {
+        alert('Microphone access denied: ' + e.message);
+        return;
+      }
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TARGET_SR });
+      await audioCtx.resume();
+
+      const srcNode = audioCtx.createMediaStreamSource(micStream);
+
+      // Analyser for waveform visualiser
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      srcNode.connect(analyser);
+
+      // ScriptProcessor to capture PCM and send over WS
+      scriptProc = audioCtx.createScriptProcessor(4096, 1, 1);
+      srcNode.connect(scriptProc);
+      scriptProc.connect(audioCtx.destination);
+
+      let pcmBuffer = new Int16Array(0);
+
+      scriptProc.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const float32 = e.inputBuffer.getChannelData(0);
+        const int16   = float32ToInt16(float32);
+        // Concatenate into rolling buffer
+        const merged  = new Int16Array(pcmBuffer.length + int16.length);
+        merged.set(pcmBuffer); merged.set(int16, pcmBuffer.length);
+        pcmBuffer = merged;
+
+        // Send in 250ms chunks
+        const chunkSamples = TARGET_SR / 4;   // 4000 samples
+        while (pcmBuffer.length >= chunkSamples) {
+          const chunk = pcmBuffer.slice(0, chunkSamples);
+          pcmBuffer   = pcmBuffer.slice(chunkSamples);
+          ws.send(chunk.buffer);
+        }
+      };
+
+      recording = true;
+      micBtn.classList.add('recording');
+      micBtn.textContent = '⏹';
+      micLabel.textContent = 'Stop Mic';
+      setBanner('enrolling','⏳','Enrolling Speaker…','Capturing first 3 seconds to build your voice profile…');
+
+      connectWS();
+      drawWaveform();
+    }
+
+    function stopMic() {
+      recording = false;
+      micBtn.classList.remove('recording');
+      micBtn.textContent = '🎙️';
+      micLabel.textContent = 'Start Mic';
+
+      if (scriptProc)  { scriptProc.disconnect(); scriptProc = null; }
+      if (micStream)   { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      if (audioCtx)    { audioCtx.close(); audioCtx = null; }
+      if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); }
+      analyser = null;
+    }
+
+    function float32ToInt16(f32) {
+      const int16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++) {
+        const s = Math.max(-1, Math.min(1, f32[i]));
+        int16[i] = s < 0 ? s * 32768 : s * 32767;
+      }
+      return int16;
+    }
+
+    /* ── Waveform visualiser ─────────────────────────────────────── */
+    function drawWaveform() {
+      if (!recording && !analyser) return;
+      requestAnimationFrame(drawWaveform);
+
+      const W = canvas.parentElement.clientWidth;
+      const H = 90;
+      canvas.width  = W;
+      canvas.height = H;
+
+      ctx2d.clearRect(0, 0, W, H);
+
+      if (!analyser) {
+        ctx2d.fillStyle = 'rgba(255,255,255,0.04)';
+        ctx2d.fillRect(0, H/2 - 1, W, 2);
+        return;
+      }
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(data);
+
+      ctx2d.strokeStyle = 'rgba(77,135,245,0.85)';
+      ctx2d.lineWidth   = 2;
+      ctx2d.shadowColor = 'rgba(77,135,245,0.5)';
+      ctx2d.shadowBlur  = 6;
+      ctx2d.beginPath();
+
+      const slice = W / data.length;
+      let x = 0;
+      for (let i = 0; i < data.length; i++) {
+        const y = (data[i] / 255.0) * H;
+        if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
+        x += slice;
+      }
+      ctx2d.stroke();
+      ctx2d.shadowBlur = 0;
+    }
+
+    /* ── Manual enroll via file upload ──────────────────────────── */
+    async function enrollSpeaker() {
+      const fileInput = document.getElementById('enroll-file');
+      const statusEl  = document.getElementById('enroll-status');
+      if (!fileInput.files.length) {
+        statusEl.textContent = 'Please select a WAV or FLAC file first.';
+        return;
+      }
+      const file = fileInput.files[0];
+      statusEl.textContent = 'Uploading and enrolling…';
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const resp = await fetch(`/api/enroll?speaker_id=manual`, { method: 'POST', body: form });
+        const data = await resp.json();
+        if (data.status === 'enrolled') {
+          statusEl.textContent = `✅ Speaker enrolled: ${data.speaker_id}`;
+        } else {
+          statusEl.textContent = `⚠️ Enrollment failed: ${data.detail || 'unknown error'}`;
+        }
+      } catch(e) {
+        statusEl.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    /* ── Init ────────────────────────────────────────────────────── */
+    drawWaveform();
+  </script>
+</body>
+</html>

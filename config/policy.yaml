@@ -1,7 +1,16 @@
+# config/policy.yaml
+# VoiceGuard Policy Engine Configuration
+#
+# Demo settings: block threshold lowered to 0.78 so AI-cloned voices
+# (which typically score 0.70-0.85 on heuristic fusion) trigger BLOCK reliably.
+# Production: raise block to 0.88 to reduce false positives on genuine callers.
+#
+# All values are override-only: fields missing here fall back to PolicyEngine.DEFAULT_CONFIG.
+
 thresholds:
-  block:   0.88
-  alert:   0.72
-  step_up: 0.50
+  block:   0.78   # DEMO: 0.78 (production: 0.88)
+  alert:   0.65   # Likely synthetic — alert fraud agent
+  step_up: 0.42   # Suspicious — request additional verification
 
 context_penalties:
   caller_id_spoofed:     0.10
@@ -10,6 +19,13 @@ context_penalties:
   number_reputation_bad: 0.08
   unusual_time:          0.04
   unusual_request:       0.05
+
+# Direct acoustic signal penalties (applied in _compute_adjusted_score)
+# These are additive to the fusion score when the corresponding signals are elevated.
+liveness_penalty_threshold: 0.65   # liveness_score >= this triggers penalty
+liveness_penalty_weight:    0.15   # max penalty added at liveness_score = 1.0
+replay_penalty_threshold:   0.50   # replay_score >= this triggers penalty
+replay_penalty_weight:      0.12   # max penalty added at replay_score = 1.0
 
 transaction_risk_tiers:
   1000:  0.03

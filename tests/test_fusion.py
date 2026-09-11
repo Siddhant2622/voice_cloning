@@ -16,10 +16,13 @@ class TestScoreBundle:
     def test_feature_vector_all_present(self):
         bundle = ScoreBundle(cm_score=0.8, sv_score=0.6, liveness_score=0.5)
         fv = bundle.to_feature_vector()
-        assert len(fv) == 4
-        assert fv[0] == pytest.approx(0.8)
-        assert fv[1] == pytest.approx(0.6)
-        assert fv[2] == pytest.approx(0.5)
+        # Vector order: [cm_score, sv_score, liveness_score, replay_score, watermark]
+        assert len(fv) == 5, f"Expected 5-element vector, got {len(fv)}: {fv}"
+        assert fv[0] == pytest.approx(0.8)   # cm_score
+        assert fv[1] == pytest.approx(0.6)   # sv_score
+        assert fv[2] == pytest.approx(0.5)   # liveness_score
+        assert fv[3] == pytest.approx(0.5)   # replay_score (None → NEUTRAL_SCORE=0.5)
+        assert fv[4] == pytest.approx(0.0)   # watermark (False)
 
     def test_feature_vector_missing_imputed(self):
         bundle = ScoreBundle(cm_score=0.7)   # no sv, liveness
@@ -30,7 +33,8 @@ class TestScoreBundle:
     def test_watermark_encoding(self):
         bundle = ScoreBundle(cm_score=0.5, watermark_detected=True)
         fv = bundle.to_feature_vector()
-        assert fv[3] == pytest.approx(1.0)
+        # watermark is at index 4 (after replay_score was added at index 3)
+        assert fv[4] == pytest.approx(1.0)
 
     def test_to_dict_excludes_none(self):
         bundle = ScoreBundle(cm_score=0.5)

@@ -43,6 +43,12 @@ drive.mount('/content/drive')
 
 DRIVE_ROOT = "/content/drive/MyDrive/voiceguard"
 os.makedirs(DRIVE_ROOT, exist_ok=True)
+os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
+os.makedirs(f"{DRIVE_ROOT}/cache", exist_ok=True)
+os.makedirs(f"{DRIVE_ROOT}/data", exist_ok=True)
+os.makedirs(f"{DRIVE_ROOT}/results", exist_ok=True)
+os.environ["VOICEGUARD_DRIVE_ROOT"] = DRIVE_ROOT
+os.environ["DRIVE_ROOT"] = DRIVE_ROOT
 
 os.chdir("/content")
 if not os.path.exists("voiceguard"):
@@ -61,7 +67,10 @@ with open("/content/cfg.json", "w") as f:
     json.dump(cfg, f)
 
 print(f"✓ Repo cloned and config saved")
-print(f"✓ Drive root: {DRIVE_ROOT}")
+print(f"✓ Drive root initialized: {DRIVE_ROOT}")
+print(f"  - Checkpoints: {DRIVE_ROOT}/models")
+print(f"  - Cache:       {DRIVE_ROOT}/cache")
+print(f"  - Datasets:    {DRIVE_ROOT}/data")
 """
 
 # ─── SECTION 3: Download ASVspoof 2019 LA ─────────────────────────────────────
@@ -109,7 +118,7 @@ for fname in FILES:
             z.extractall(DATA_DIR)
         print(f"✓ Extracted {fname}")
 
-print("\\n✓ ASVspoof 2019 LA dataset ready!")
+print("\\n✓ ASVspoof 2019 LA dataset ready on Drive!")
 """
 
 # ─── SECTION 4: Prepare dataset ───────────────────────────────────────────────
@@ -152,16 +161,19 @@ with open("/content/cfg.json") as f:
 
 DRIVE_ROOT = cfg["DRIVE_ROOT"]
 OUT_MODEL  = f"{DRIVE_ROOT}/models/cm_asvspoof19.pt"
+CACHE_PATH = f"{DRIVE_ROOT}/cache/features_cache.pt"
 os.makedirs(f"{DRIVE_ROOT}/models", exist_ok=True)
+os.makedirs(f"{DRIVE_ROOT}/cache", exist_ok=True)
 os.chdir(cfg["REPO_DIR"])
 
 print("Starting training... (this takes ~2-3 hours on T4 GPU)")
-print("You can close this tab — Drive saves progress automatically")
+print("Checkpoints and caches save directly to Google Drive so you can disconnect safely.")
 print()
 
 result = subprocess.run([
     "python", "training/train_cm.py",
     "--data",      f"{DRIVE_ROOT}/asvspoof2019_prepared/train",
+    "--cache",     CACHE_PATH,
     "--val-split", "0.1",
     "--epochs",    "50",
     "--lr",        "0.0003",
@@ -172,9 +184,43 @@ result = subprocess.run([
 if result.returncode == 0:
     size_mb = os.path.getsize(OUT_MODEL) / 1e6
     print(f"\\n✓ Training complete!")
-    print(f"  Checkpoint: {OUT_MODEL}  ({size_mb:.1f} MB)")
+    print(f"  Checkpoint saved persistently on Drive: {OUT_MODEL}  ({size_mb:.1f} MB)")
 else:
     print("ERROR during training — check output above")
+"""
+
+# ─── SECTION 5B: Train Modern Hardened DETECT-2B Model (Alternative) ────────
+# Paste this into Colab Cell 5B to train on ASVspoof 2017 V2 + Modern Data with
+# Codec and Mobile Replay augmentations
+
+CELL_5B = """
+import subprocess, json, os
+
+with open("/content/cfg.json") as f:
+    cfg = json.load(f)
+
+DRIVE_ROOT = cfg["DRIVE_ROOT"]
+OUT_MODEL  = f"{DRIVE_ROOT}/models/cm_detect2b_v4.pt"
+CACHE_DIR  = f"{DRIVE_ROOT}/cache"
+os.chdir(cfg["REPO_DIR"])
+
+print("Starting Modern DETECT-2B training with Google Drive persistence...")
+result = subprocess.run([
+    "python", "training/train_modern.py",
+    "--data-dir",  "data/modern_dataset",
+    "--asvspoof2017-dir", "data/asvspoof2017",
+    "--out",       OUT_MODEL,
+    "--cache-dir", CACHE_DIR,
+    "--epochs",    "60",
+    "--max-samples", "500",
+])
+
+if result.returncode == 0:
+    size_mb = os.path.getsize(OUT_MODEL) / 1e6
+    print(f"\\n✓ Modern training complete!")
+    print(f"  Checkpoint saved persistently on Drive: {OUT_MODEL}  ({size_mb:.1f} MB)")
+else:
+    print("ERROR during modern training — check output above")
 """
 
 # ─── SECTION 6: Push to Hugging Face Hub ─────────────────────────────────────

@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VoiceGuard — SIH 2024 Live Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#050a12;--surface:#0c1520;--card:#111d2c;--border:rgba(255,255,255,.07);--accent:#2dd4bf;--blue:#3b82f6;--amber:#f59e0b;--danger:#ef4444;--success:#22c55e;--purple:#a855f7;--text:#e2e8f0;--muted:#64748b;--r:14px;--r-sm:8px}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(59,130,246,.12) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 80%,rgba(45,212,191,.08) 0%,transparent 60%);pointer-events:none}
+#root{position:relative;z-index:1}
+header{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(5,10,18,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:.6rem}.logo-text{font-size:1.15rem;font-weight:800;letter-spacing:-.02em}.logo-text span{color:var(--accent)}
+.sih-badge{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;font-size:.7rem;font-weight:700;padding:.25rem .6rem;border-radius:20px;letter-spacing:.05em}
+#ws-status{display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .3s}
+.dot.live{background:var(--success);animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.35)}50%{box-shadow:0 0 0 5px transparent}}
+.step-nav{display:flex;justify-content:center;padding:1.5rem 2rem;position:relative}
+.step-nav::before{content:'';position:absolute;top:50%;left:calc(50% - 280px);right:calc(50% - 280px);height:2px;background:var(--border);transform:translateY(-50%);z-index:0}
+.step-item{display:flex;flex-direction:column;align-items:center;gap:.4rem;position:relative;z-index:1;min-width:140px;cursor:pointer}
+.step-num{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;background:var(--surface);border:2px solid var(--border);color:var(--muted);transition:all .3s}
+.step-item.active .step-num{background:linear-gradient(135deg,var(--blue),var(--accent));border-color:transparent;color:#fff;box-shadow:0 0 20px rgba(45,212,191,.3)}
+.step-item.done .step-num{background:var(--success);border-color:transparent;color:#fff}
+.step-label{font-size:.7rem;font-weight:600;color:var(--muted);text-align:center}
+.step-item.active .step-label{color:var(--accent)}.step-item.done .step-label{color:var(--success)}
+main{max-width:1100px;margin:0 auto;padding:1rem 1.5rem 4rem}
+.phase{display:none}.phase.active{display:block;animation:fadeIn .35s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem}
+.card-title{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.phase-hero{text-align:center;margin-bottom:2rem}
+.phase-hero h2{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.4rem}
+.phase-hero p{color:var(--muted);font-size:.9rem;max-width:520px;margin:0 auto}
+.badge-row{display:flex;justify-content:center;gap:.5rem;margin-bottom:1.2rem}
+.badge{font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .55rem;border-radius:20px}
+.badge.blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.badge.green{background:rgba(34,197,94,.12);color:var(--success);border:1px solid rgba(34,197,94,.3)}
+.badge.red{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+.badge.amber{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.mic-btn-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
+.mic-btn{width:90px;height:90px;border-radius:50%;cursor:pointer;border:none;background:linear-gradient(135deg,var(--blue),var(--accent));display:flex;align-items:center;justify-content:center;font-size:2rem;color:#fff;box-shadow:0 0 40px rgba(59,130,246,.4);transition:transform .2s,box-shadow .2s}
+.mic-btn:hover{transform:scale(1.06)}
+.mic-btn.recording{background:linear-gradient(135deg,var(--danger),#f97316);animation:mic-pulse 1s infinite}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 30px rgba(239,68,68,.5)}50%{box-shadow:0 0 55px rgba(239,68,68,.8)}}
+.mic-btn.stopped{background:linear-gradient(135deg,#334155,#475569);box-shadow:none;cursor:default}
+.mic-label{font-size:.85rem;color:var(--muted);font-weight:500}
+.waveform-wrap{background:rgba(0,0,0,.3);border-radius:var(--r-sm);overflow:hidden;height:70px;position:relative}
+canvas.waveform{width:100%;height:100%;display:block}
+.progress-bar-bg{height:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.progress-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--accent));width:0%;transition:width .3s ease}
+.progress-label{font-size:.75rem;color:var(--muted);margin-top:.4rem}
+.signal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem}
+.signal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:1rem}
+.signal-name{font-size:.65rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+.signal-val{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:600;margin-bottom:.5rem}
+.signal-bar-bg{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.signal-bar{height:100%;border-radius:99px;width:0%;transition:width .4s ease,background .4s}
+.signal-bar.low{background:var(--success)}.signal-bar.mid{background:var(--amber)}.signal-bar.high{background:var(--danger)}
+#decision-banner{border-radius:var(--r);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;transition:all .4s ease;margin-bottom:1rem;background:var(--surface);border:1px solid var(--border)}
+#decision-banner.allow{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3)}
+#decision-banner.block{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4);animation:shake .3s}
+#decision-banner.step_up{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)}
+#decision-banner.alert{background:rgba(249,115,22,.08);border-color:rgba(249,115,22,.3)}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.banner-icon{font-size:2rem;flex-shrink:0}
+.banner-label{font-size:1.1rem;font-weight:800}.banner-reason{font-size:.78rem;color:var(--muted);margin-top:.2rem}
+.banner-score{margin-left:auto;text-align:right;flex-shrink:0}
+.score-val{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700}
+.score-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.txn-card{background:linear-gradient(135deg,#1a2840,#0f1e30);border:1px solid var(--border);border-radius:18px;padding:1.75rem;position:relative;overflow:hidden;transition:all .5s ease}
+.txn-card::before{content:'';position:absolute;top:-40%;right:-20%;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.15) 0%,transparent 70%)}
+.txn-bank{font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem}
+.txn-amount{font-size:2.4rem;font-weight:900;letter-spacing:-.03em;margin-bottom:.25rem}
+.txn-amount span{font-size:1.1rem;font-weight:400;color:var(--muted);margin-left:.3rem}
+.txn-to{font-size:.78rem;color:var(--muted);margin-bottom:1.5rem}.txn-to strong{color:var(--text)}
+.txn-status-badge{padding:.4rem 1rem;border-radius:8px;font-size:.8rem;font-weight:700;letter-spacing:.04em;transition:all .5s}
+.txn-status-badge.pending{background:rgba(100,116,139,.15);color:var(--muted);border:1px solid rgba(100,116,139,.2)}
+.txn-status-badge.verifying{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);animation:verifying-pulse 1.2s infinite}
+.txn-status-badge.approved{background:rgba(34,197,94,.15);color:var(--success);border:1px solid rgba(34,197,94,.3)}
+.txn-status-badge.blocked{background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+@keyframes verifying-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.txn-btn{margin-top:1.25rem;padding:.75rem 2rem;border-radius:10px;border:none;cursor:pointer;font-size:.9rem;font-weight:700;font-family:'Inter',sans-serif;background:linear-gradient(135deg,var(--blue),var(--accent));color:#fff;transition:all .2s}
+.txn-btn:hover:not(:disabled){transform:scale(1.03)}.txn-btn:disabled{opacity:.4;cursor:default;transform:none}
+.txn-result{margin-top:1.5rem;padding:1rem;border-radius:var(--r-sm);display:none}
+.txn-result.approved{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3)}
+.txn-result.blocked{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3)}
+.txn-result-head{font-size:1rem;font-weight:800;margin-bottom:.4rem}.txn-result-body{font-size:.78rem;color:var(--muted)}
+.txn-result-ref{font-family:'JetBrains Mono',monospace;font-size:.75rem;margin-top:.5rem;color:var(--accent)}
+.txn-overlay{position:absolute;inset:0;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:4rem;opacity:0;transition:opacity .4s;pointer-events:none}
+.txn-overlay.show{opacity:1}.txn-overlay.approved{background:rgba(34,197,94,.85)}.txn-overlay.blocked{background:rgba(239,68,68,.85)}
+#blocked-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(10,0,0,.97);flex-direction:column;align-items:center;justify-content:center;text-align:center}
+#blocked-overlay.show{display:flex;animation:fadeIn .3s}
+.blocked-icon{font-size:6rem;animation:blocked-pulse 1s ease-out;margin-bottom:1rem}
+@keyframes blocked-pulse{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
+.blocked-title{font-size:2.5rem;font-weight:900;color:var(--danger);letter-spacing:-.04em}
+.blocked-sub{font-size:1rem;color:var(--muted);margin-top:.5rem;max-width:400px}
+.blocked-score{font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:700;margin-top:1.5rem;color:var(--danger)}
+.blocked-dismiss{margin-top:2rem;padding:.7rem 2rem;border-radius:10px;border:none;cursor:pointer;background:rgba(239,68,68,.2);color:var(--danger);font-size:.9rem;font-weight:700;border:1px solid rgba(239,68,68,.4);font-family:'Inter',sans-serif}
+.blocked-signals{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
+.bsig{font-size:.7rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--danger);padding:.25rem .6rem;border-radius:20px}
+.explain-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:700px){.explain-grid{grid-template-columns:1fr}}
+.explain-row{display:flex;align-items:center;gap:.75rem;padding:.65rem .75rem;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border)}
+.explain-icon{font-size:1.2rem;flex-shrink:0;width:32px;text-align:center}
+.explain-label{font-size:.78rem;font-weight:600;flex:1}.explain-note{font-size:.68rem;color:var(--muted)}
+.explain-chip{padding:.2rem .55rem;border-radius:20px;font-size:.68rem;font-weight:700;flex-shrink:0}
+.explain-chip.normal{background:rgba(34,197,94,.12);color:var(--success)}
+.explain-chip.suspect{background:rgba(245,158,11,.12);color:var(--amber)}
+.explain-chip.attack{background:rgba(239,68,68,.12);color:var(--danger)}
+.explain-chip.na{background:rgba(100,116,139,.12);color:var(--muted)}
+.btn{padding:.6rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;font-family:'Inter',sans-serif;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--accent));color:#fff}
+.btn-primary:hover:not(:disabled){transform:scale(1.03)}.btn-primary:disabled{opacity:.4;cursor:default}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+.btn-row{display:flex;gap:.75rem;justify-content:center;margin-top:1.5rem}
+#decision-log{max-height:180px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:.68rem}
+.log-entry{padding:.3rem 0;border-bottom:1px solid var(--border);color:var(--muted);display:flex;gap:.75rem}
+.log-entry .lt{color:var(--accent);flex-shrink:0}.log-entry .la{font-weight:700;flex-shrink:0}
+.log-entry .la.ALLOW{color:var(--success)}.log-entry .la.BLOCK{color:var(--danger)}
+.log-entry .la.STEP_UP{color:var(--amber)}.log-entry .la.ALERT{color:#f97316}
+h3.sh{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;margin-top:1.5rem;display:flex;align-items:center;gap:.5rem}
+h3.sh::after{content:'';flex:1;height:1px;background:var(--border)}
+.attack-file-area{border:2px dashed rgba(239,68,68,.3);border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;transition:all .2s}
+.attack-file-area:hover{border-color:var(--danger);background:rgba(239,68,68,.04)}
+.attack-file-area input{display:none}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- Blocked overlay -->
+<div id="blocked-overlay">
+  <div class="blocked-icon">🚫</div>
+  <div class="blocked-title">AI VOICE DETECTED</div>
+  <div class="blocked-sub" id="blocked-reason">High-confidence synthetic speech. Session terminated.</div>
+  <div class="blocked-score" id="blocked-score-text">Risk Score: —</div>
+  <div class="blocked-signals" id="blocked-signals-row"></div>
+  <button class="blocked-dismiss" onclick="dismissBlocked()">↩ Continue Demo</button>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo"><span style="font-size:1.5rem">🛡️</span><span class="logo-text">Voice<span>Guard</span></span></div>
+  <span class="sih-badge">SIH 2024 DEMO</span>
+  <div id="ws-status"><div class="dot" id="ws-dot"></div><span id="ws-label">Disconnected</span></div>
+</header>
+
+<!-- Step nav -->
+<div class="step-nav">
+  <div class="step-item active" id="nav-0" onclick="gotoPhase(0)">
+    <div class="step-num" id="snum-0">1</div><div class="step-label">Enroll Voice</div>
+  </div>
+  <div class="step-item" id="nav-1" onclick="gotoPhase(1)">
+    <div class="step-num" id="snum-1">2</div><div class="step-label">Verify Human</div>
+  </div>
+  <div class="step-item" id="nav-2" onclick="gotoPhase(2)">
+    <div class="step-num" id="snum-2">3</div><div class="step-label">Protect Action</div>
+  </div>
+  <div class="step-item" id="nav-3" onclick="gotoPhase(3)">
+    <div class="step-num" id="snum-3">4</div><div class="step-label">AI Attack Demo</div>
+  </div>
+</div>
+
+<main>
+
+<!-- PHASE 0: ENROLL -->
+<section class="phase active" id="phase-0">
+  <div class="phase-hero">
+    <div class="badge-row"><span class="badge blue">Step 1 of 4</span></div>
+    <h2>Enroll Your Voice</h2>
+    <p>VoiceGuard captures a 3-second voice sample to build a biometric speaker profile — the reference for every subsequent window.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">🎙️ Voice Enrollment</div>
+      <div class="mic-btn-wrap">
+        <button class="mic-btn" id="enroll-mic-btn" onclick="toggleEnroll()">🎙️</button>
+        <div class="mic-label" id="enroll-mic-label">Click to start enrollment</div>
+      </div>
+      <div style="margin-top:1.25rem;">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="enroll-progress"></div></div>
+        <div class="progress-label" id="enroll-progress-label">Waiting to start...</div>
+      </div>
+      <div id="enroll-status" style="font-size:.9rem;font-weight:600;text-align:center;margin-top:.75rem;min-height:1.5rem;color:var(--muted);"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Live Waveform</div>
+      <div class="waveform-wrap"><canvas class="waveform" id="waveform-enroll"></canvas></div>
+      <div style="margin-top:1rem;">
+        <div class="card-title" style="margin-top:.75rem">ℹ️ How enrollment works</div>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:.4rem;">
+          <li style="font-size:.78rem;color:var(--muted)">🔊 Captured at <strong style="color:var(--text)">16 kHz mono</strong> — same as training pipeline</li>
+          <li style="font-size:.78rem;color:var(--muted)">🧠 ECAPA-TDNN extracts a <strong style="color:var(--text)">192-dim speaker embedding</strong></li>
+          <li style="font-size:.78rem;color:var(--muted)">🔒 Stored <strong style="color:var(--text)">in-session only</strong> — never persisted or logged</li>
+          <li style="font-size:.78rem;color:var(--muted)">⚡ Each 1s window is verified against this reference in real time</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="btn-row"><button class="btn btn-primary" id="btn-next-0" onclick="gotoPhase(1)" disabled>Continue → Verify Voice</button></div>
+</section>
+
+<!-- PHASE 1: LIVE DETECTION -->
+<section class="phase" id="phase-1">
+  <div class="phase-hero">
+    <div class="badge-row"><span class="badge green">Step 2 of 4</span></div>
+    <h2>Real-Time Voice Analysis</h2>
+    <p>Speak naturally. VoiceGuard scores every 1-second window across 4 independent signals. A genuine human voice shows green across all metrics.</p>
+  </div>
+
+  <div id="decision-banner">
+    <div class="banner-icon" id="banner-icon">🎤</div>
+    <div style="flex:1">
+      <div class="banner-label" id="banner-label">Waiting for audio...</div>
+      <div class="banner-reason" id="banner-reason">Speak into your microphone to begin analysis.</div>
+    </div>
+    <div class="banner-score">
+      <div class="score-val" id="banner-score">—</div>
+      <div class="score-lbl">Risk Score</div>
+    </div>
+  </div>
+
+  <div class="signal-grid">
+    <div class="signal-card"><div class="signal-name">🧠 CM Spoof</div><div class="signal-val" id="sig-cm">—</div><div class="signal-bar-bg"><div class="signal-bar" id="bar-cm"></div></div></div>
+    <div class="signal-card"><div class="signal-name">💓 Liveness</div><div class="signal-val" id="sig-lv">—</div><div class="signal-bar-bg"><div class="signal-bar" id="bar-lv"></div></div></div>
+    <div class="signal-card"><div class="signal-name">🆔 Speaker ID</div><div class="signal-val" id="sig-sv">—</div><div class="signal-bar-bg"><div class="signal-bar" id="bar-sv"></div></div></div>
+    <div class="signal-card"><div class="signal-name">🔄 Replay Risk</div><div class="signal-val" id="sig-rp">—</div><div class="signal-bar-bg"><div class="signal-bar" id="bar-rp"></div></div></div>
+    <div class="signal-card"><div class="signal-name">🔀 Fusion</div><div class="signal-val" id="sig-fuse">—</div><div class="signal-bar-bg"><div class="signal-bar" id="bar-fuse"></div></div></div>
+    <div class="signal-card"><div class="signal-name">⏱️ Latency</div><div class="signal-val" id="sig-lat">—</div><div class="progress-label">Window inference</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-title">📊 Microphone Input</div>
+    <div class="waveform-wrap"><canvas class="waveform" id="waveform-live"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Decision Log</div>
+    <div id="decision-log"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="gotoPhase(0)">← Back</button>
+    <button class="btn btn-primary" onclick="gotoPhase(2)">Continue → Protected Action</button>
+  </div>
+</section>
+
+<!-- PHASE 2: PROTECTED TRANSACTION -->
+<section class="phase" id="phase-2">
+  <div class="phase-hero">
+    <div class="badge-row"><span class="badge amber">Step 3 of 4</span></div>
+    <h2>Protected Action Gate</h2>
+    <p>A simulated ₹50,000 bank transfer requires voice authorization. The system checks your current voice risk score before allowing the transaction.</p>
+  </div>
+  <div class="grid2">
+    <div>
+      <div class="txn-card" id="txn-card">
+        <div class="txn-overlay" id="txn-overlay"></div>
+        <div class="txn-bank">🏦 VOICEGUARD SECURE BANK</div>
+        <div class="txn-amount">₹50,000 <span>INR</span></div>
+        <div class="txn-to">To: <strong>Axis Bank · ••••1234</strong> — Rohan Sharma</div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div class="txn-status-badge pending" id="txn-badge">PENDING AUTHORIZATION</div>
+        </div>
+        <button class="txn-btn" id="txn-btn" onclick="authorizeTransaction()">🔐 Authorize with Voice</button>
+        <div class="txn-result" id="txn-result">
+          <div class="txn-result-head" id="txn-result-head"></div>
+          <div class="txn-result-body" id="txn-result-body"></div>
+          <div class="txn-result-ref" id="txn-result-ref"></div>
+        </div>
+      </div>
+      <div class="btn-row" style="justify-content:flex-start;margin-top:.75rem;">
+        <button class="btn btn-ghost" onclick="resetTransaction()">↩ Reset Transaction</button>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-title">🔴 Live Voice Monitor</div>
+        <div class="waveform-wrap" style="height:55px;"><canvas class="waveform" id="waveform-txn"></canvas></div>
+        <div style="margin-top:.75rem;">
+          <div id="txn-decision-label" style="font-size:.9rem;font-weight:700;color:var(--muted);">Speak to authorize...</div>
+          <div id="txn-decision-score" style="font-size:.75rem;color:var(--muted);"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Voice Signals (Live)</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+          <div class="explain-row"><span class="explain-icon">🧠</span><span class="explain-label">CM Spoof</span><span class="explain-chip na" id="txn-sig-cm">—</span></div>
+          <div class="explain-row"><span class="explain-icon">💓</span><span class="explain-label">Liveness</span><span class="explain-chip na" id="txn-sig-lv">—</span></div>
+          <div class="explain-row"><span class="explain-icon">🆔</span><span class="explain-label">Speaker ID</span><span class="explain-chip na" id="txn-sig-sv">—</span></div>
+          <div class="explain-row"><span class="explain-icon">🔀</span><span class="explain-label">Fusion Score</span><span class="explain-chip na" id="txn-sig-fuse">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="gotoPhase(1)">← Back</button>
+    <button class="btn btn-primary" onclick="gotoPhase(3)">Continue → Attack Demo</button>
+  </div>
+</section>
+
+<!-- PHASE 3: AI ATTACK DEMO -->
+<section class="phase" id="phase-3">
+  <div class="phase-hero">
+    <div class="badge-row"><span class="badge red">Step 4 of 4</span></div>
+    <h2>AI Voice Attack Demo</h2>
+    <p>Play or upload an AI-cloned / TTS audio sample near the microphone. VoiceGuard detects and blocks it in real time.</p>
+  </div>
+  <div class="grid2" style="margin-bottom:1rem;">
+    <div class="card">
+      <div class="card-title">🎭 Attack Vector</div>
+      <div class="attack-file-area" onclick="document.getElementById('attack-file').click()">
+        <input type="file" id="attack-file" accept="audio/*" onchange="loadAttackFile(event)"/>
+        <div style="font-size:1.5rem;margin-bottom:.5rem;">📂</div>
+        <div style="font-size:.85rem;font-weight:600;">Upload spoof audio file</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.25rem;">WAV / MP3 / OGG — play near mic</div>
+      </div>
+      <div style="text-align:center;margin:1rem 0;font-size:.75rem;color:var(--muted);">— or —</div>
+      <div style="text-align:center;">
+        <button class="btn btn-ghost" onclick="playBuiltinAttack()" style="font-size:.8rem;">▶ Play Built-in TTS Sample</button>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:.4rem;">Plays monotone synthetic audio via Web Audio</div>
+      </div>
+      <div id="attack-audio-wrap" style="margin-top:1rem;display:none;">
+        <audio id="attack-audio" controls style="width:100%;border-radius:8px;"></audio>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">👁️ What to Observe</div>
+      <div style="display:flex;flex-direction:column;gap:.65rem;">
+        <div class="explain-row"><span class="explain-icon">📈</span><div><div class="explain-label">CM Score spikes</div><div class="explain-note">Neural vocoder artifacts raise countermeasure score above 0.7</div></div></div>
+        <div class="explain-row"><span class="explain-icon">📉</span><div><div class="explain-label">Liveness anomaly</div><div class="explain-note">Unnaturally flat spectrum — TTS produces too-tonal output</div></div></div>
+        <div class="explain-row"><span class="explain-icon">🔇</span><div><div class="explain-label">Speaker mismatch</div><div class="explain-note">ECAPA cosine similarity drops vs enrolled human reference</div></div></div>
+        <div class="explain-row"><span class="explain-icon">🚫</span><div><div class="explain-label">BLOCK fires at 0.78</div><div class="explain-note">WebSocket closes 1008; full-screen alert triggers</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="decision-banner-4" style="border-radius:var(--r);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;transition:all .4s ease;margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);">
+    <div style="font-size:2rem;">🎭</div>
+    <div style="flex:1">
+      <div style="font-size:1.1rem;font-weight:800;" id="banner4-label">Monitoring for synthetic speech...</div>
+      <div style="font-size:.78rem;color:var(--muted);" id="banner4-reason">Play AI audio near your microphone.</div>
+    </div>
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;" id="banner4-score">—</div>
+      <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);">Risk Score</div>
+    </div>
+  </div>
+
+  <h3 class="sh" style="margin-top:0">Why was this decision made?</h3>
+  <div class="explain-grid">
+    <div class="explain-row"><span class="explain-icon">🧠</span><div style="flex:1"><div class="explain-label">CM Spoof Score</div><div class="explain-note" id="ex-cm-note">Waiting...</div></div><span class="explain-chip na" id="ex-cm">—</span></div>
+    <div class="explain-row"><span class="explain-icon">💓</span><div style="flex:1"><div class="explain-label">Liveness Suspicion</div><div class="explain-note" id="ex-lv-note">Waiting...</div></div><span class="explain-chip na" id="ex-lv">—</span></div>
+    <div class="explain-row"><span class="explain-icon">🆔</span><div style="flex:1"><div class="explain-label">Speaker Verification</div><div class="explain-note" id="ex-sv-note">Waiting...</div></div><span class="explain-chip na" id="ex-sv">—</span></div>
+    <div class="explain-row"><span class="explain-icon">🔄</span><div style="flex:1"><div class="explain-label">Replay / Bandwidth</div><div class="explain-note" id="ex-rp-note">Waiting...</div></div><span class="explain-chip na" id="ex-rp">—</span></div>
+    <div class="explain-row"><span class="explain-icon">🔀</span><div style="flex:1"><div class="explain-label">Fusion Score</div><div class="explain-note" id="ex-fuse-note">Weighted ensemble output</div></div><span class="explain-chip na" id="ex-fuse">—</span></div>
+    <div class="explain-row"><span class="explain-icon">⚖️</span><div style="flex:1"><div class="explain-label">Policy Decision</div><div class="explain-note" id="ex-dec-note">Threshold: BLOCK ≥ 0.78</div></div><span class="explain-chip na" id="ex-dec">—</span></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="gotoPhase(2)">← Back</button>
+    <button class="btn btn-danger" onclick="resetAll()">↩ Restart Demo</button>
+  </div>
+</section>
+</main>
+</div>
+
+<script>
+'use strict';
+const WS_URL  = `ws://${location.host}/ws/mic-stream`;
+const API_URL = `http://${location.host}`;
+let ws=null,mediaStream=null,audioCtx=null,processor=null;
+let sessionId=null,enrolled=false,enrollDone=false,enrollStarted=false;
+let currentPhase=0,lastFrame=null,logEntries=[];
+const WAVE_LEN=512;
+let waveData=new Float32Array(WAVE_LEN),waveIdx=0;
+let animId=null;
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function gotoPhase(n){
+  if(n===currentPhase) return;
+  document.querySelectorAll('.phase').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`phase-${n}`).classList.add('active');
+  document.querySelectorAll('.step-item').forEach((el,i)=>{
+    el.classList.remove('active','done');
+    if(i<n) el.classList.add('done');
+    else if(i===n) el.classList.add('active');
+    document.getElementById(`snum-${i}`).textContent=i<n?'✓':i+1;
+  });
+  currentPhase=n;
+  if(n>=1&&(!ws||ws.readyState>1)) startWS();
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────────
+function startWS(){
+  ws=new WebSocket(WS_URL);
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>{setWs(true);if(!mediaStream) startMic();};
+  ws.onmessage=ev=>{try{handleFrame(JSON.parse(ev.data));}catch(e){}};
+  ws.onclose=ev=>{setWs(false);if(ev.code===1008) showBlockedOverlay(lastFrame);setTimeout(()=>{if(currentPhase>=1)startWS();},2000);};
+  ws.onerror=()=>setWs(false);
+}
+function setWs(ok){
+  document.getElementById('ws-dot').className='dot'+(ok?' live':'');
+  document.getElementById('ws-label').textContent=ok?'Live':'Disconnected';
+}
+
+// ── Microphone ──────────────────────────────────────────────────────────────
+async function startMic(){
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,sampleRate:16000,echoCancellation:false,noiseSuppression:false}});
+    audioCtx=new AudioContext({sampleRate:16000});
+    const src=audioCtx.createMediaStreamSource(mediaStream);
+    processor=audioCtx.createScriptProcessor(4096,1,1);
+    processor.onaudioprocess=e=>{
+      const raw=e.inputBuffer.getChannelData(0);
+      for(let i=0;i<raw.length;i++){waveData[waveIdx%WAVE_LEN]=raw[i];waveIdx++;}
+      if(ws&&ws.readyState===1){
+        const out=new Int16Array(raw.length);
+        for(let i=0;i<raw.length;i++) out[i]=Math.max(-32768,Math.min(32767,raw[i]*32768));
+        ws.send(out.buffer);
+      }
+    };
+    src.connect(processor);processor.connect(audioCtx.destination);
+    drawLoop();
+  }catch(err){alert('Mic access denied: '+err.message);}
+}
+function stopMic(){
+  if(processor){try{processor.disconnect();}catch(e){} processor=null;}
+  if(audioCtx){try{audioCtx.close();}catch(e){} audioCtx=null;}
+  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+}
+
+// ── Waveform ────────────────────────────────────────────────────────────────
+function drawWC(id){
+  const c=document.getElementById(id); if(!c) return;
+  const ctx=c.getContext('2d');
+  const W=c.offsetWidth||400,H=c.offsetHeight||70;
+  c.width=W;c.height=H;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#3b82f6';ctx.lineWidth=1.5;
+  ctx.shadowColor='#3b82f6';ctx.shadowBlur=8;
+  ctx.beginPath();
+  for(let i=0;i<WAVE_LEN;i++){
+    const x=(i/WAVE_LEN)*W;
+    const y=H/2-waveData[(waveIdx+i)%WAVE_LEN]*(H/2-4);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+function drawLoop(){
+  cancelAnimationFrame(animId);
+  function lp(){drawWC('waveform-enroll');drawWC('waveform-live');drawWC('waveform-txn');animId=requestAnimationFrame(lp);}
+  lp();
+}
+
+// ── Enrollment ──────────────────────────────────────────────────────────────
+function toggleEnroll(){
+  if(enrollDone) return;
+  if(!enrollStarted){enrollStarted=true;document.getElementById('enroll-mic-btn').classList.add('recording');document.getElementById('enroll-mic-label').textContent='Recording...';startWS();}
+}
+
+// ── Frame handler ────────────────────────────────────────────────────────────
+function handleFrame(f){
+  lastFrame=f;
+  if(f.session_id&&!sessionId) sessionId=f.session_id;
+
+  if(f.type==='enrolling'){
+    const m=(f.message||'').match(/([\d.]+)s\s*\/\s*([\d.]+)s/);
+    if(m){
+      const pct=Math.min(100,(parseFloat(m[1])/parseFloat(m[2]))*100);
+      document.getElementById('enroll-progress').style.width=pct+'%';
+      document.getElementById('enroll-progress-label').textContent=`Enrolling... ${m[1]}s / ${m[2]}s`;
+    }
+    return;
+  }
+  if(f.type==='info'){
+    const msg=(f.message||'').toLowerCase();
+    if(msg.includes('enrolled')||msg.includes('active')||msg.includes('skipped')){
+      enrolled=enrollDone=true;
+      document.getElementById('enroll-progress').style.width='100%';
+      document.getElementById('enroll-progress-label').textContent='Enrollment complete ✓';
+      const es=document.getElementById('enroll-status');
+      es.style.color='var(--success)';
+      es.textContent=msg.includes('skipped')?'✓ CM+liveness only (SV unavailable)':'✓ Voice profile created!';
+      document.getElementById('enroll-mic-btn').className='mic-btn stopped';
+      document.getElementById('enroll-mic-btn').textContent='✓';
+      document.getElementById('enroll-mic-label').textContent='Enrolled successfully';
+      document.getElementById('btn-next-0').disabled=false;
+    }
+    return;
+  }
+  if(!['allow','block','step_up','alert','score','blocked'].includes(f.type)) return;
+
+  const dec=f.decision||(f.type==='blocked'?'BLOCK':f.type?.toUpperCase())||'ALLOW';
+  const fuse=f.fusion_score??null,cm=f.cm_score??null,lv=f.liveness_score??null,sv=f.sv_score??null,rp=f.replay_score??null;
+  const lat=f.latency_ms??null,reason=f.reason||'';
+
+  updateBanner(dec,fuse,reason);
+  updateBar('cm',cm);updateBar('lv',lv);updateBar('sv',sv);updateBar('rp',rp);updateBar('fuse',fuse);
+  const sl=document.getElementById('sig-lat'); if(sl) sl.textContent=lat!=null?lat.toFixed(0)+' ms':'—';
+  updateTxn(dec,fuse,cm,lv,sv);
+  updateAttack(dec,fuse,cm,lv,sv,rp,reason);
+  addLog(dec,fuse,cm,lv);
+  if(dec==='BLOCK'||f.type==='blocked') showBlockedOverlay(f);
+}
+
+// ── Decision banner ──────────────────────────────────────────────────────────
+const BM={ALLOW:{icon:'✅',label:'HUMAN VOICE — ALLOWED',cls:'allow',c:'var(--success)'},BLOCK:{icon:'🚫',label:'AI VOICE — SESSION BLOCKED',cls:'block',c:'var(--danger)'},STEP_UP:{icon:'⚠️',label:'SUSPICIOUS — STEP-UP REQUIRED',cls:'step_up',c:'var(--amber)'},ALERT:{icon:'🔔',label:'SUSPICIOUS — AGENT ALERTED',cls:'alert',c:'#f97316'}};
+function updateBanner(dec,score,reason){
+  const b=BM[dec]||BM.ALLOW;
+  const el=document.getElementById('decision-banner'); if(!el) return;
+  el.className=b.cls;
+  document.getElementById('banner-icon').textContent=b.icon;
+  const lbl=document.getElementById('banner-label');
+  lbl.textContent=b.label;lbl.style.color=b.c;
+  document.getElementById('banner-reason').textContent=reason.replace(/\(score=[\d.]+\)\./,'').trim();
+  const sv=document.getElementById('banner-score');
+  sv.textContent=score!=null?score.toFixed(3):'—';sv.style.color=b.c;
+}
+
+// ── Signal bars ──────────────────────────────────────────────────────────────
+function updateBar(id,val){
+  const s=document.getElementById(`sig-${id}`),b=document.getElementById(`bar-${id}`);
+  if(!s||!b) return;
+  if(val==null){s.textContent='—';return;}
+  s.textContent=val.toFixed(3);
+  b.style.width=(val*100).toFixed(1)+'%';
+  b.className='signal-bar '+(val<0.4?'low':val<0.65?'mid':'high');
+}
+
+// ── Transaction panel ────────────────────────────────────────────────────────
+function chip(v){return v==null?'na':v<0.4?'normal':v<0.65?'suspect':'attack';}
+function setChip(id,val,cls){const el=document.getElementById(id);if(!el)return;el.className='explain-chip '+cls;el.textContent=val!=null?val.toFixed(3):'—';}
+function updateTxn(dec,fuse,cm,lv,sv){
+  const b=BM[dec]||BM.ALLOW;
+  const lbl=document.getElementById('txn-decision-label'); if(!lbl) return;
+  lbl.textContent=b.label;lbl.style.color=b.c;
+  document.getElementById('txn-decision-score').textContent=fuse!=null?`Fusion: ${fuse.toFixed(3)}`:'';
+  setChip('txn-sig-cm',cm,chip(cm));setChip('txn-sig-lv',lv,chip(lv));setChip('txn-sig-sv',sv,chip(sv));setChip('txn-sig-fuse',fuse,chip(fuse));
+}
+
+// ── Attack / explainability panel ─────────────────────────────────────────────
+function note(v,labels){if(v==null) return 'Unavailable';if(v<0.35) return labels[0];if(v<0.60) return labels[1];return labels[2];}
+function updateAttack(dec,fuse,cm,lv,sv,rp,reason){
+  const b=BM[dec]||BM.ALLOW;
+  const d4=document.getElementById('decision-banner-4'); if(!d4) return;
+  const bg={BLOCK:'rgba(239,68,68,.1)',ALLOW:'rgba(34,197,94,.08)',STEP_UP:'rgba(245,158,11,.08)',ALERT:'rgba(249,115,22,.08)'};
+  const bc={BLOCK:'rgba(239,68,68,.4)',ALLOW:'rgba(34,197,94,.3)',STEP_UP:'rgba(245,158,11,.3)',ALERT:'rgba(249,115,22,.3)'};
+  d4.style.background=bg[dec]||'';d4.style.borderColor=bc[dec]||'';
+  document.getElementById('banner4-label').textContent=b.label;
+  document.getElementById('banner4-label').style.color=b.c;
+  document.getElementById('banner4-reason').textContent=reason.replace(/\(score=[\d.]+\)\./,'').trim();
+  document.getElementById('banner4-score').textContent=fuse!=null?fuse.toFixed(3):'—';
+  document.getElementById('banner4-score').style.color=b.c;
+  setChip('ex-cm',cm,chip(cm));setChip('ex-lv',lv,chip(lv));setChip('ex-sv',sv,chip(sv));setChip('ex-rp',rp,chip(rp));setChip('ex-fuse',fuse,chip(fuse));
+  const dc=dec==='BLOCK'?'attack':dec==='ALLOW'?'normal':'suspect';
+  setChip('ex-dec',null,dc);document.getElementById('ex-dec').textContent=dec;
+  document.getElementById('ex-cm-note').textContent=note(cm,['Neural vocoder unlikely','Mild artifacts detected','Strong synthetic artifacts']);
+  document.getElementById('ex-lv-note').textContent=note(lv,['Natural spectral variation','Slightly smooth spectrum','Unnaturally tonal — TTS indicator']);
+  document.getElementById('ex-sv-note').textContent=note(sv,['Matches enrolled speaker','Partial speaker mismatch','Speaker identity mismatch']);
+  document.getElementById('ex-rp-note').textContent=note(rp,['No bandwidth rolloff','Mild high-freq cutoff','Mobile speaker replay suspected']);
+  document.getElementById('ex-fuse-note').textContent=fuse!=null?`Ensemble risk = ${fuse.toFixed(3)} (BLOCK ≥ 0.78)`:'Weighted ensemble output';
+  document.getElementById('ex-dec-note').textContent=dec==='BLOCK'?'🚫 Session terminated — score ≥ 0.78':dec==='ALLOW'?'✅ Accepted — score < 0.45':'⚠️ Step-up or alert triggered';
+}
+
+// ── Decision log ─────────────────────────────────────────────────────────────
+function addLog(dec,fuse,cm,lv){
+  const t=new Date().toLocaleTimeString('en-IN',{hour12:false});
+  logEntries.push({t,dec,fuse,cm,lv});
+  if(logEntries.length>40) logEntries.shift();
+  const el=document.getElementById('decision-log'); if(!el) return;
+  el.innerHTML=logEntries.slice().reverse().map(e=>`<div class="log-entry"><span class="lt">${e.t}</span><span class="la ${e.dec}">${e.dec}</span><span>fusion=${e.fuse!=null?e.fuse.toFixed(3):'—'} cm=${e.cm!=null?e.cm.toFixed(3):'—'} lv=${e.lv!=null?e.lv.toFixed(3):'—'}</span></div>`).join('');
+}
+
+// ── Blocked overlay ───────────────────────────────────────────────────────────
+function showBlockedOverlay(f){
+  if(!f) return;
+  document.getElementById('blocked-reason').textContent=(f.reason||'High-confidence synthetic speech.').replace(/\(score=[\d.]+\)\./,'').trim();
+  document.getElementById('blocked-score-text').textContent=`Risk Score: ${(f.risk_score??f.fusion_score??0).toFixed(4)}`;
+  const sigs=[];
+  if(f.cm_score!=null) sigs.push(`CM: ${f.cm_score.toFixed(3)}`);
+  if(f.liveness_score!=null) sigs.push(`Liveness: ${f.liveness_score.toFixed(3)}`);
+  if(f.sv_score!=null) sigs.push(`SV: ${f.sv_score.toFixed(3)}`);
+  if(f.replay_score!=null) sigs.push(`Replay: ${f.replay_score.toFixed(3)}`);
+  document.getElementById('blocked-signals-row').innerHTML=sigs.map(s=>`<span class="bsig">${s}</span>`).join('');
+  document.getElementById('blocked-overlay').classList.add('show');
+  const badge=document.getElementById('txn-badge');
+  if(badge&&badge.className.includes('verifying')){badge.className='txn-status-badge blocked';badge.textContent='🚫 BLOCKED';}
+}
+function dismissBlocked(){document.getElementById('blocked-overlay').classList.remove('show');}
+
+// ── Transaction ────────────────────────────────────────────────────────────────
+async function authorizeTransaction(){
+  if(!sessionId&&!lastFrame){alert('No voice session. Start mic on Phase 2 first.');return;}
+  const btn=document.getElementById('txn-btn'),badge=document.getElementById('txn-badge');
+  btn.disabled=true;badge.className='txn-status-badge verifying';badge.textContent='VERIFYING VOICE...';
+  try{
+    const res=await fetch(`${API_URL}/api/protected-action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId||'demo',action_type:'wire_transfer',amount:50000,currency:'INR'})});
+    const data=await res.json();
+    setTimeout(()=>renderTxnResult(data),900);
+  }catch{
+    const dec=lastFrame?.decision||'ALLOW',fuse=lastFrame?.fusion_score||0;
+    setTimeout(()=>renderTxnResult({status:dec==='BLOCK'?'blocked':dec==='STEP_UP'?'step_up':'approved',decision:dec,risk_score:fuse,reason:dec==='BLOCK'?'AI-generated voice detected.':'Voice verified.',reference:'TXN'+Math.random().toString(36).substr(2,8).toUpperCase(),amount:50000,currency:'INR'}),900);
+  }
+}
+function renderTxnResult(data){
+  const badge=document.getElementById('txn-badge'),result=document.getElementById('txn-result'),
+        rHead=document.getElementById('txn-result-head'),rBody=document.getElementById('txn-result-body'),
+        rRef=document.getElementById('txn-result-ref'),overlay=document.getElementById('txn-overlay');
+  if(data.status==='approved'){
+    badge.className='txn-status-badge approved';badge.textContent='✅ APPROVED';
+    result.className='txn-result approved';rHead.style.color='var(--success)';
+    rHead.textContent='✅ Transaction Approved';rBody.textContent=data.reason;
+    rRef.textContent=`Reference: ${data.reference}`;
+    overlay.className='txn-overlay approved show';overlay.textContent='✅';
+    setTimeout(()=>overlay.classList.remove('show'),1500);
+  }else if(data.status==='step_up'){
+    badge.className='txn-status-badge';badge.style.background='rgba(245,158,11,.15)';badge.style.color='var(--amber)';badge.textContent='⚠️ STEP-UP REQUIRED';
+    result.className='txn-result';result.style.background='rgba(245,158,11,.08)';result.style.border='1px solid rgba(245,158,11,.3)';
+    rHead.style.color='var(--amber)';rHead.textContent='⚠️ Additional Verification Required';
+    rBody.textContent=data.reason;rRef.textContent=`Risk Score: ${data.risk_score?.toFixed(4)}`;
+  }else{
+    badge.className='txn-status-badge blocked';badge.textContent='🚫 BLOCKED';
+    result.className='txn-result blocked';rHead.style.color='var(--danger)';
+    rHead.textContent='🚫 Transaction Blocked — AI Voice Detected';
+    rBody.textContent=data.reason;rRef.textContent=`Risk Score: ${data.risk_score?.toFixed(4)}`;
+    overlay.className='txn-overlay blocked show';overlay.textContent='🚫';
+    setTimeout(()=>overlay.classList.remove('show'),2000);
+  }
+  result.style.display='block';
+}
+function resetTransaction(){
+  document.getElementById('txn-badge').className='txn-status-badge pending';
+  document.getElementById('txn-badge').textContent='PENDING AUTHORIZATION';
+  document.getElementById('txn-btn').disabled=false;
+  const r=document.getElementById('txn-result');r.style.display='none';r.className='txn-result';
+  const ov=document.getElementById('txn-overlay');ov.className='txn-overlay';ov.textContent='';
+}
+
+// ── Attack demo ────────────────────────────────────────────────────────────────
+function loadAttackFile(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const url=URL.createObjectURL(file);
+  document.getElementById('attack-audio').src=url;
+  document.getElementById('attack-audio-wrap').style.display='block';
+}
+function playBuiltinAttack(){
+  const ac=new(window.AudioContext||window.webkitAudioContext)();
+  const dur=3,buf=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=0.3*Math.sin(2*Math.PI*200*i/ac.sampleRate);
+  const src=ac.createBufferSource();src.buffer=buf;src.connect(ac.destination);src.start();
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll(){
+  stopMic();if(ws){try{ws.close();}catch(e){} ws=null;}
+  enrolled=enrollDone=enrollStarted=false;sessionId=null;lastFrame=null;logEntries=[];
+  waveData.fill(0);waveIdx=0;cancelAnimationFrame(animId);
+  document.getElementById('enroll-mic-btn').className='mic-btn';
+  document.getElementById('enroll-mic-btn').textContent='🎙️';
+  document.getElementById('enroll-mic-label').textContent='Click to start enrollment';
+  document.getElementById('enroll-progress').style.width='0%';
+  document.getElementById('enroll-progress-label').textContent='Waiting to start...';
+  document.getElementById('enroll-status').textContent='';
+  document.getElementById('btn-next-0').disabled=true;
+  resetTransaction();gotoPhase(0);
+}
+</script>
+</body>
+</html>
