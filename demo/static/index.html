@@ -3257,6 +3257,9 @@ function renderChart(canvas) {
       }
     }
   });
+  } catch (e) {
+    console.warn('Chart render notice:', e);
+  }
 }
 
 </script>
