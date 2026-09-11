@@ -582,8 +582,8 @@
     </div>
     <div class="header-actions">
       <div class="header-status">
-        <span class="status-dot" id="conn-dot"></span>
-        <span id="conn-label">Initializing...</span>
+        <span class="status-dot edge" id="conn-dot"></span>
+        <span id="conn-label">Edge Engine Active (Browser)</span>
       </div>
       <button class="btn-settings" id="btn-open-settings">⚙️ Settings</button>
     </div>
@@ -1198,8 +1198,21 @@ let consecutiveAiWindows = 0; // count of consecutive windows with high spoof sc
 
 const SAMPLE_RATE = 16000;
 const CHUNK_MS    = 100;
-let customWsUrl   = localStorage.getItem('voiceguard_ws_url') || '';
-let forcedEngine  = localStorage.getItem('voiceguard_engine_mode') || 'auto';
+function safeGetStorage(key, defaultVal = '') {
+  try {
+    return (typeof localStorage !== 'undefined' && localStorage.getItem(key)) || defaultVal;
+  } catch (e) {
+    return defaultVal;
+  }
+}
+function safeSetStorage(key, val) {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, val);
+  } catch (e) {}
+}
+
+let customWsUrl   = safeGetStorage('voiceguard_ws_url', '');
+let forcedEngine  = safeGetStorage('voiceguard_engine_mode', 'auto');
 
 /* ─── Global AI Voice Analyst Audio Buffer (Fixed 15s Ring Buffer) ──────── */
 const MAX_ANALYST_SAMPLES = 16000 * 15;
@@ -1289,17 +1302,19 @@ function initConnection() {
     return;
   }
 
-  // Vercel serverless functions do not support stateful WebSockets.
+  // Vercel serverless functions, static hosting, and file protocol do not support stateful WebSockets.
   // Activate in-browser Edge Engine directly unless user configured a custom backend URL in Settings.
   const isVercelHost = location.hostname.endsWith('.vercel.app') || location.hostname.includes('vercel.app');
-  if (isVercelHost && !customWsUrl && forcedEngine !== 'ws') {
+  const isStaticOrFile = location.protocol === 'file:' || !location.hostname || (!customWsUrl && !['localhost', '127.0.0.1'].includes(location.hostname));
+
+  if ((isVercelHost || isStaticOrFile) && !customWsUrl && forcedEngine !== 'ws') {
     setEdgeMode();
     return;
   }
 
   const targetUrl = getWsUrl();
-  connDot.className = 'status-dot';
-  connLabel.textContent = 'Probing Backend...';
+  if (connDot) connDot.className = 'status-dot';
+  if (connLabel) connLabel.textContent = 'Probing Backend...';
 
   try {
     ws = new WebSocket(targetUrl);
@@ -1307,7 +1322,7 @@ function initConnection() {
 
     let connectionTimeout = setTimeout(() => {
       if (ws && ws.readyState !== 1) {
-        ws.close();
+        try { ws.close(); } catch (e) {}
         if (forcedEngine !== 'ws') setEdgeMode();
       }
     }, 2000);
@@ -1315,16 +1330,16 @@ function initConnection() {
     ws.onopen = () => {
       clearTimeout(connectionTimeout);
       activeMode = 'ws';
-      connDot.className = 'status-dot connected';
-      connLabel.textContent = 'GPU Backend Connected';
+      if (connDot) connDot.className = 'status-dot connected';
+      if (connLabel) connLabel.textContent = 'GPU Backend Connected';
     };
 
     ws.onclose = () => {
       clearTimeout(connectionTimeout);
       ws = null;
       if (forcedEngine === 'ws') {
-        connDot.className = 'status-dot error';
-        connLabel.textContent = 'Backend Offline';
+        if (connDot) connDot.className = 'status-dot error';
+        if (connLabel) connLabel.textContent = 'Backend Offline';
       } else {
         setEdgeMode();
       }
@@ -1353,8 +1368,16 @@ function initConnection() {
 
 function setEdgeMode() {
   activeMode = 'edge';
-  connDot.className = 'status-dot edge';
-  connLabel.textContent = 'Edge Engine Active (Browser)';
+  if (connDot) connDot.className = 'status-dot edge';
+  if (connLabel) connLabel.textContent = 'Edge Engine Active (Browser)';
+}
+
+// Immediately trigger connection resolution
+try {
+  initConnection();
+} catch (e) {
+  console.warn('VoiceGuard early init fallback:', e);
+  setEdgeMode();
 }
 
 /* ─── Score Update Handler ──────────────────────────────────────────────── */
@@ -2515,8 +2538,8 @@ btnCloseSettings.onclick = () => settingsModal.classList.remove('open');
 btnSaveSettings.onclick  = () => {
   customWsUrl  = wsUrlInput.value.trim();
   forcedEngine = engineModeSelect.value;
-  localStorage.setItem('voiceguard_ws_url', customWsUrl);
-  localStorage.setItem('voiceguard_engine_mode', forcedEngine);
+  safeSetStorage('voiceguard_ws_url', customWsUrl);
+  safeSetStorage('voiceguard_engine_mode', forcedEngine);
   settingsModal.classList.remove('open');
   if (ws) ws.close();
   initConnection();
@@ -2576,7 +2599,11 @@ fileInput.onchange = async (e) => {
 };
 
 /* ─── Initialization ─────────────────────────────────────────────────────── */
-initConnection();
+try {
+  initConnection();
+} catch (e) {
+  setEdgeMode();
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AI VOICE ANALYST — Client-Side Quality + Latency Engine
